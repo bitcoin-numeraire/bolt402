@@ -2,16 +2,16 @@
 //!
 //! LND gRPC backend adapter for the bolt402 L402 client SDK.
 //!
-//! This crate implements the [`bolt402_core::LnBackend`] trait from `bolt402-core` using
+//! This crate implements the [`bolt402_core::LnBackend`] trait using
 //! LND's gRPC API, enabling the L402 client to pay invoices, query balances,
 //! and retrieve node information through a connected LND node.
 //!
 //! ## Setup
 //!
-//! Connecting to LND requires three things:
-//! - The gRPC endpoint address (must start with `https://`)
-//! - A TLS certificate file (`tls.cert`)
-//! - A macaroon file (typically `admin.macaroon` for payment capabilities)
+//! Connecting to LND requires:
+//! - gRPC endpoint (e.g. `https://localhost:10009`)
+//! - TLS certificate (`tls.cert`)
+//! - Admin macaroon (`admin.macaroon`)
 //!
 //! ## Example
 //!
@@ -26,34 +26,32 @@
 //!     "/path/to/admin.macaroon",
 //! ).await?;
 //!
-//! // Use with bolt402-core's L402Client:
-//! // let client = L402Client::builder()
-//! //     .ln_backend(backend)
-//! //     .token_store(InMemoryTokenStore::default())
-//! //     .build()?;
-//!
 //! let info = backend.get_info().await?;
-//! println!("Connected to node: {} ({})", info.alias, info.pubkey);
-//!
-//! let balance = backend.get_balance().await?;
-//! println!("Spendable balance: {} sats", balance);
+//! println!("Connected to: {} ({})", info.alias, info.pubkey);
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! ## Architecture
 //!
-//! This crate is an **adapter** in the hexagonal architecture pattern.
-//! It depends on `bolt402-core` for the [`bolt402_core::LnBackend`] port trait and
-//! implements it using `fedimint-tonic-lnd` for gRPC communication.
-//!
-//! ```text
-//! bolt402-core (ports)
-//!      ↑
-//! bolt402-lnd (adapter: implements LnBackend via LND gRPC)
-//! ```
+//! This crate is an adapter in the hexagonal architecture. It depends on
+//! `bolt402-core` for the [`bolt402_core::LnBackend`] port trait and uses
+//! `tonic` with vendored LND proto files for gRPC communication.
 
 mod backend;
+
+/// Generated LND gRPC types.
+#[allow(
+    clippy::all,
+    clippy::pedantic,
+    missing_docs,
+    unused_qualifications,
+    unreachable_pub,
+    rustdoc::invalid_html_tags
+)]
+pub mod lnrpc {
+    tonic::include_proto!("lnrpc");
+}
 
 pub use backend::LndBackend;
 pub use backend::LndError;
