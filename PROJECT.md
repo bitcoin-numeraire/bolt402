@@ -52,8 +52,8 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] CI/CD pipeline (GitHub Actions: fmt, clippy, test, doc) — PR #1
 - [x] bolt402-core: L402Client (client.rs, the core engine) — PR #6
 - [ ] bolt402-lnd: LND gRPC backend adapter — Issue #4
-- [ ] bolt402-mock: Mock L402 server for testing — Issue #3
-- [ ] Integration tests using bolt402-mock — Issue #5
+- [x] bolt402-mock: Mock L402 server for testing — PR #9
+- [x] Integration tests using bolt402-mock — Issue #5 / PR #12
 - [ ] CONTRIBUTING.md, issue templates, CHANGELOG.md
 - [ ] Comprehensive documentation and tutorials
 
