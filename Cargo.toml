@@ -6,6 +6,8 @@ members = [
     "crates/bolt402-lnd",
     "crates/bolt402-mock",
     "crates/bolt402-swissknife",
+    "examples/basic-mock",
+    "examples/budget-control",
 ]
 
 [workspace.lints.rust]

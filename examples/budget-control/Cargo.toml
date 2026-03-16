@@ -1,0 +1,14 @@
+[package]
+name = "example-budget-control"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "budget-control"
+path = "main.rs"
+
+[dependencies]
+bolt402-core = { path = "../../crates/bolt402-core" }
+bolt402-mock = { path = "../../crates/bolt402-mock" }
+tokio = { version = "1", features = ["full"] }
