@@ -10,3 +10,7 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 PROJECT.md
+
+# TypeScript packages
+packages/*/node_modules/
+packages/*/dist/
