@@ -56,7 +56,7 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] Integration tests using bolt402-mock — Issue #5 / PR #12
 - [x] bolt402-swissknife: SwissKnife REST API backend adapter — Issue #7 / PR #13
 - [ ] Vercel AI SDK integration — Issue #8
-- [ ] CONTRIBUTING.md, issue templates, CHANGELOG.md
+- [x] CONTRIBUTING.md, issue templates, CHANGELOG.md — PR #16
 - [ ] Comprehensive documentation and tutorials
 
 **Note on signed commits**: Repo ruleset requires signed commits on `main`. Workaround: push unsigned commits to feature branches, create PRs, squash-merge via GitHub (GitHub signs the merge commit automatically).

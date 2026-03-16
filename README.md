@@ -111,4 +111,6 @@ at your option.
 
 ## Contributing
 
-This project is maintained by [@darioAnongba](https://github.com/darioAnongba). Contributions welcome. Please open an issue first to discuss.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and the PR workflow.
+
+This project is maintained by [@darioAnongba](https://github.com/darioAnongba). Please open an issue first to discuss before starting work.
