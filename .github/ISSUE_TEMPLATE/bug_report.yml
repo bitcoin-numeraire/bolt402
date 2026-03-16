@@ -1,0 +1,81 @@
+name: Bug Report
+description: Report a bug in bolt402
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below so we can reproduce and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to reproduce the behavior.
+      placeholder: |
+        1. Create an L402Client with ...
+        2. Call client.get("...")
+        3. Observe error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened. Include error messages, logs, or stack traces if available.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: crate
+    attributes:
+      label: Affected Crate(s)
+      description: Which crate(s) does this bug affect?
+      multiple: true
+      options:
+        - bolt402-proto
+        - bolt402-core
+        - bolt402-lnd
+        - bolt402-swissknife
+        - bolt402-mock
+        - bolt402-ai-sdk (TypeScript)
+    validations:
+      required: true
+
+  - type: input
+    id: rust-version
+    attributes:
+      label: Rust Version
+      description: Output of `rustc --version`.
+      placeholder: "rustc 1.85.0 (a7fb6b4ce 2025-01-17)"
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "Ubuntu 24.04 / macOS 15 / Windows 11"
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or configuration details.

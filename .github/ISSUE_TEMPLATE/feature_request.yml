@@ -1,0 +1,57 @@
+name: Feature Request
+description: Suggest a new feature or improvement for bolt402
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe what you'd like and why it would be useful.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this feature solve? What's the use case?
+      placeholder: "I'm trying to ... but currently I can't because ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you think this should work? Include API sketches if applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches have you considered? Why are they less suitable?
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Which part of the project does this affect?
+      multiple: true
+      options:
+        - bolt402-proto (protocol types)
+        - bolt402-core (client engine)
+        - bolt402-lnd (LND backend)
+        - bolt402-swissknife (SwissKnife backend)
+        - bolt402-mock (mock server)
+        - bolt402-ai-sdk (Vercel AI SDK)
+        - New crate / package
+        - Documentation
+        - CI / Tooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, mockups, references, or links.
