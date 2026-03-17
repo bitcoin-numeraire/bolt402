@@ -203,16 +203,38 @@ async fn budget_per_request_blocks_expensive_request() {
         domain_budgets: std::collections::HashMap::new(),
     };
 
-    // The budget check in the current implementation checks with amount=0
-    // (since BOLT11 decode isn't implemented), so per_request_max won't trigger
-    // on the initial check. This test documents current behavior.
+    // Endpoint charges 100 sats, per-request limit is 50 sats.
+    // The BOLT11 decoder extracts the real amount, so the budget check blocks it.
     let (client, server) = setup(vec![("/api/data", EndpointConfig::new(100))], budget, 1024).await;
 
     let url = format!("{}/api/data", server.url());
     let result = client.get(&url).await;
 
-    // With current implementation, the per-request check passes (amount=0)
-    // and the payment succeeds. This test verifies the flow doesn't panic.
+    let Err(err) = result else {
+        panic!("expected budget exceeded error, got Ok");
+    };
+    assert!(
+        format!("{err}").contains("budget exceeded"),
+        "expected budget exceeded error, got: {err}"
+    );
+}
+
+#[tokio::test]
+async fn budget_per_request_allows_cheap_request() {
+    let budget = Budget {
+        per_request_max: Some(200),
+        hourly_max: None,
+        daily_max: None,
+        total_max: None,
+        domain_budgets: std::collections::HashMap::new(),
+    };
+
+    // Endpoint charges 100 sats, per-request limit is 200 sats — should pass.
+    let (client, server) = setup(vec![("/api/data", EndpointConfig::new(100))], budget, 1024).await;
+
+    let url = format!("{}/api/data", server.url());
+    let result = client.get(&url).await;
+
     assert!(result.is_ok());
 }
 
@@ -229,8 +251,32 @@ async fn budget_total_limit_blocks_excess_spending() {
     let (client, server) = setup(vec![("/api/data", EndpointConfig::new(100))], budget, 1024).await;
 
     let url = format!("{}/api/data", server.url());
-    // First request records 0 sats (no invoice decode), so it passes.
-    // This documents current behavior.
+    // With BOLT11 decoding, the 100 sat invoice is correctly decoded and
+    // blocked by the zero total budget.
+    let result = client.get(&url).await;
+    let Err(err) = result else {
+        panic!("expected budget exceeded error, got Ok");
+    };
+    assert!(
+        format!("{err}").contains("budget exceeded"),
+        "expected budget exceeded error, got: {err}"
+    );
+}
+
+#[tokio::test]
+async fn budget_total_limit_allows_within_budget() {
+    let budget = Budget {
+        per_request_max: None,
+        hourly_max: None,
+        daily_max: None,
+        total_max: Some(500),
+        domain_budgets: std::collections::HashMap::new(),
+    };
+
+    let (client, server) = setup(vec![("/api/data", EndpointConfig::new(100))], budget, 1024).await;
+
+    let url = format!("{}/api/data", server.url());
+    // 100 sats is within 500 sat total budget
     let result = client.get(&url).await;
     assert!(result.is_ok());
 }

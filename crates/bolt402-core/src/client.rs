@@ -50,7 +50,7 @@ use reqwest::header::{AUTHORIZATION, HeaderValue, WWW_AUTHENTICATE};
 use reqwest::{Client as HttpClient, StatusCode};
 use tokio::sync::RwLock;
 
-use bolt402_proto::{L402Challenge, L402Token};
+use bolt402_proto::{L402Challenge, L402Token, decode_bolt11_amount};
 
 use crate::budget::{Budget, BudgetTracker};
 use crate::error::ClientError;
@@ -276,12 +276,15 @@ impl L402Client {
             .ok()
             .and_then(|u| u.host_str().map(String::from));
 
-        // Check budget before paying (we don't know the exact amount from the
-        // invoice without a full BOLT11 decoder, so we use a placeholder of 0
-        // for the per-request check — the budget tracker checks the amount
-        // recorded after payment)
+        // Decode the invoice amount for budget enforcement.
+        // Zero-amount invoices (no amount in the BOLT11 string) pass with 0.
+        let invoice_amount_sats = decode_bolt11_amount(&challenge.invoice)
+            .map(|opt| opt.map_or(0, |a| a.satoshis()))
+            .unwrap_or(0);
+
+        // Check budget with the decoded amount before paying
         self.budget_tracker
-            .check_and_record(0, domain.as_deref())
+            .check_and_record(invoice_amount_sats, domain.as_deref())
             .await?;
 
         // Pay the invoice

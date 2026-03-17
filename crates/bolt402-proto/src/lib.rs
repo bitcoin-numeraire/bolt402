@@ -33,6 +33,9 @@
 //! assert_eq!(auth_header, "L402 YWJjZGVm:abcdef1234567890");
 //! ```
 
+/// BOLT11 invoice amount decoding.
+pub mod bolt11;
+
 /// L402 challenge parsing from `WWW-Authenticate` headers.
 pub mod challenge;
 
@@ -42,6 +45,7 @@ pub mod error;
 /// L402 authorization token construction and parsing.
 pub mod token;
 
+pub use bolt11::{InvoiceAmount, decode_bolt11_amount};
 pub use challenge::L402Challenge;
 pub use error::L402Error;
 pub use token::L402Token;

@@ -41,7 +41,24 @@ impl PendingChallenge {
         let macaroon_data = format!(r#"{{"payment_hash":"{payment_hash}"}}"#);
         let macaroon = BASE64.encode(macaroon_data.as_bytes());
 
-        let invoice = format!("lnbc{amount_sats}n1mock{}", &payment_hash[..20]);
+        // Encode amount as microbitcoin: 1u = 100 sats, so amount_sats / 100 = value in u.
+        // For amounts not divisible by 100, use nanobitcoin: 1n = 0.1 sats, so amount_sats * 10 = value in n.
+        // For sub-sat precision, we default to nanobitcoin.
+        //
+        // The data portion uses bech32-safe characters (no '1', 'b', 'i', 'o')
+        // so that rfind('1') correctly finds the separator in BOLT11 parsing.
+        let safe_hash = payment_hash
+            .chars()
+            .map(|c| if c == '1' { 'x' } else { c })
+            .take(20)
+            .collect::<String>();
+
+        let invoice = if amount_sats >= 100 && amount_sats % 100 == 0 {
+            format!("lnbc{}u1mock{safe_hash}", amount_sats / 100)
+        } else {
+            // Use nanobitcoin: amount_sats sats = amount_sats * 10 nanobitcoin
+            format!("lnbc{}n1mock{safe_hash}", amount_sats * 10)
+        };
 
         Self {
             preimage,
@@ -132,6 +149,22 @@ mod tests {
         let challenge = PendingChallenge::generate(100);
         let header = challenge.to_www_authenticate();
         assert!(header.starts_with("L402 macaroon=\""));
-        assert!(header.contains("invoice=\"lnbc100n1mock"));
+        // 100 sats = 1u (microbitcoin)
+        assert!(header.contains("invoice=\"lnbc1u1mock"));
+    }
+
+    #[test]
+    fn invoice_amount_encoding_micro() {
+        // Amounts divisible by 100 use microbitcoin
+        let challenge = PendingChallenge::generate(500);
+        assert!(challenge.invoice.starts_with("lnbc5u1mock"));
+    }
+
+    #[test]
+    fn invoice_amount_encoding_nano() {
+        // Amounts not divisible by 100 use nanobitcoin
+        let challenge = PendingChallenge::generate(50);
+        // 50 sats = 500 nanobitcoin
+        assert!(challenge.invoice.starts_with("lnbc500n1mock"));
     }
 }
