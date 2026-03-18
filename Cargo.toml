@@ -6,6 +6,18 @@ members = [
     "crates/bolt402-lnd",
     "crates/bolt402-mock",
     "crates/bolt402-swissknife",
+    "crates/bolt402-python",
+    "examples/basic-mock",
+    "examples/budget-control",
+]
+# Exclude bolt402-python from default builds (requires Python dev libs for linking).
+# Use `maturin develop` + `pytest` to test it.
+default-members = [
+    "crates/bolt402-proto",
+    "crates/bolt402-core",
+    "crates/bolt402-lnd",
+    "crates/bolt402-mock",
+    "crates/bolt402-swissknife",
     "examples/basic-mock",
     "examples/budget-control",
 ]
@@ -67,6 +79,9 @@ axum = "0.8"
 base64 = "0.22"
 hex = "0.4"
 sha2 = "0.10"
+
+# Python bindings
+pyo3 = { version = "0.28", features = ["extension-module"] }
 
 # Async traits
 async-trait = "0.1"
