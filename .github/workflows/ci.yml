@@ -31,7 +31,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
       - run: sudo apt-get install -y protobuf-compiler
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --workspace --exclude bolt402-python --all-targets -- -D warnings
 
   test:
     name: Tests
@@ -41,7 +41,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
       - run: sudo apt-get install -y protobuf-compiler
-      - run: cargo test --workspace
+      - run: cargo test --workspace --exclude bolt402-python
 
   doc:
     name: Documentation
@@ -53,7 +53,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
       - run: sudo apt-get install -y protobuf-compiler
-      - run: cargo doc --workspace --no-deps
+      - run: cargo doc --workspace --exclude bolt402-python --no-deps
+
+  python:
+    name: Python Bindings
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/bolt402-python
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get install -y protobuf-compiler
+      - run: python -m venv .venv
+      - run: .venv/bin/pip install maturin pytest
+      - run: .venv/bin/maturin develop
+      - run: .venv/bin/pytest tests/ -v
 
   typescript:
     name: TypeScript (bolt402-ai-sdk)

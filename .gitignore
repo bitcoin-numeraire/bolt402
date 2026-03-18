@@ -11,6 +11,17 @@ Cargo.lock
 Thumbs.db
 PROJECT.md
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.so
+*.egg-info/
+dist/
+*.whl
+.pytest_cache/
+
 # TypeScript packages
 packages/*/node_modules/
 packages/*/dist/
