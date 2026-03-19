@@ -1,6 +1,7 @@
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { L402Service } from '@/lib/types';
 
@@ -52,34 +53,33 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [input, setInput] = useState('');
 
-  const [error, setError] = useState<string | null>(null);
+  const [chatTransport] = useState(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        body: () => ({
+          services: services.map((s) => ({
+            name: s.name,
+            url: s.url,
+            description: s.description,
+            pricing_sats: s.pricing_sats,
+            pricing_model: s.pricing_model,
+            categories: s.categories.map((c: { name: string }) => ({ name: c.name })),
+          })),
+        }),
+      }),
+  );
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput } =
-    useChat({
-      api: '/api/chat',
-      body: {
-        services: services.map((s) => ({
-          name: s.name,
-          url: s.url,
-          description: s.description,
-          pricing_sats: s.pricing_sats,
-          pricing_model: s.pricing_model,
-          categories: s.categories.map((c) => ({ name: c.name })),
-        })),
-      },
-      onError(err) {
-        console.error('[chat] Error:', err);
-        setError(err.message || 'Something went wrong. Check that OPENAI_API_KEY is set in .env.local.');
-      },
-      onToolCall({ toolCall }) {
-        setError(null);
-        // Track spending from tool calls
-        if (toolCall.toolName === 'l402_fetch') {
-          // We track spending when the result comes back via onFinish
-        }
-      },
-    });
+  const { messages, sendMessage, status, error } = useChat({
+    transport: chatTransport,
+    onError(err: Error) {
+      console.error('[chat] Error:', err);
+    },
+  });
+
+  const isLoading = status === 'streaming' || status === 'submitted';
 
   // Track spending from completed tool invocations
   useEffect(() => {
@@ -88,12 +88,12 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
       const parts = msg.parts;
       if (!parts) continue;
       for (const part of parts) {
-        if (part.type !== 'tool-invocation') continue;
-        const ti = part.toolInvocation;
-        if (ti.state !== 'result') continue;
-        const result = ti.result as ToolInvocationResult;
-        if (ti.toolName === 'l402_fetch' && result?.receipt) {
-          // We fire onSpend but deduplicate via a simple check
+        if (!part.type.startsWith('tool-')) continue;
+        if (!('state' in part) || part.state !== 'output-available') continue;
+        if (!('toolName' in part)) continue;
+        const toolPart = part as { toolName: string; state: string; output: unknown; input: unknown };
+        const result = toolPart.output as ToolInvocationResult;
+        if (toolPart.toolName === 'l402_fetch' && result?.receipt) {
           const key = `${result.receipt.paymentHash}`;
           if (!(window as unknown as Record<string, unknown>)[`__spent_${key}`]) {
             (window as unknown as Record<string, unknown>)[`__spent_${key}`] = true;
@@ -121,22 +121,21 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
   const handleSuggestion = useCallback(
     (text: string) => {
       setHasInteracted(true);
-      setInput(text);
-      // Submit on next tick after input is set
-      setTimeout(() => {
-        const form = document.getElementById('chat-form') as HTMLFormElement;
-        form?.requestSubmit();
-      }, 0);
+      sendMessage({ text });
     },
-    [setInput],
+    [sendMessage],
   );
 
   const onFormSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const trimmed = input.trim();
+      if (!trimmed) return;
       setHasInteracted(true);
-      handleSubmit(e);
+      setInput('');
+      sendMessage({ text: trimmed });
     },
-    [handleSubmit],
+    [input, sendMessage],
   );
 
   return (
@@ -192,15 +191,15 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
                   );
                 }
 
-                if (part.type === 'tool-invocation') {
-                  const ti = part.toolInvocation;
+                if (part.type.startsWith('tool-')) {
+                  const toolPart = part as { type: string; toolName: string; state: string; input: unknown; output?: unknown };
                   return (
                     <ToolCallDisplay
                       key={i}
-                      toolName={ti.toolName}
-                      state={ti.state}
-                      args={ti.args as Record<string, unknown>}
-                      result={ti.state === 'result' ? (ti.result as ToolInvocationResult) : undefined}
+                      toolName={toolPart.toolName}
+                      state={toolPart.state}
+                      args={(toolPart.input ?? {}) as Record<string, unknown>}
+                      result={toolPart.state === 'output-available' ? (toolPart.output as ToolInvocationResult) : undefined}
                       services={services}
                     />
                   );
@@ -210,8 +209,8 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
               })}
 
               {/* Fallback for messages without parts */}
-              {(!msg.parts || msg.parts.length === 0) && msg.content && (
-                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+              {(!msg.parts || msg.parts.length === 0) && (
+                <div className="whitespace-pre-wrap break-words text-zinc-400">...</div>
               )}
             </div>
           </div>
@@ -231,7 +230,7 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
 
         {error && (
           <div className="mx-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
-            <span className="font-medium">Error:</span> {error}
+            <span className="font-medium">Error:</span> {error.message || 'Something went wrong. Check your API key in .env.local.'}
           </div>
         )}
 
@@ -249,7 +248,7 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
             ref={inputRef}
             type="text"
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about Bitcoin price, economic data..."
             disabled={isLoading}
             className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-[#F7931A]/50 focus:outline-none focus:ring-1 focus:ring-[#F7931A]/30 disabled:opacity-50 transition-colors"
@@ -281,7 +280,7 @@ function ToolCallDisplay({
   result?: ToolInvocationResult;
   services: L402Service[];
 }) {
-  const isRunning = state === 'call' || state === 'partial-call';
+  const isRunning = state === 'input-streaming' || state === 'input-available' || state === 'streaming';
 
   if (toolName === 'l402_fetch') {
     const url = (args.url as string) || '';

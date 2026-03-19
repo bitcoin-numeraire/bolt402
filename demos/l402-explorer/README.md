@@ -26,8 +26,10 @@ The AI agent uses `createBolt402Tools()` from bolt402-ai-sdk, which gives it:
 # Install dependencies
 yarn install
 
-# Copy and edit environment variables
+# Copy and configure environment variables
 cp .env.example .env.local
+# ⚠️  You MUST set OPENAI_API_KEY in .env.local for the AI chat to work.
+# The demo defaults to mock mode (simulated Lightning payments).
 
 # Run in development mode
 yarn dev
@@ -40,9 +42,11 @@ Open [http://localhost:3000](http://localhost:3000).
 Create `.env.local` from `.env.example`:
 
 ```bash
-# Required: OpenAI for the AI chat
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o          # optional, defaults to gpt-4o
+# Pick ONE AI provider (auto-detected, priority: Anthropic > xAI > OpenAI)
+ANTHROPIC_API_KEY=sk-ant-...   # Claude
+# XAI_API_KEY=xai-...          # Grok
+# OPENAI_API_KEY=sk-...        # GPT
+# AI_MODEL=claude-sonnet-4-20250514  # optional model override
 
 # Lightning backend: lnd | swissknife | mock
 BACKEND_TYPE=mock             # default: mock (simulated payments, no real Lightning)
