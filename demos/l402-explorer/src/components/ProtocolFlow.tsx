@@ -234,8 +234,14 @@ export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlow
             <h3 className="text-xs font-semibold text-emerald-400 mb-2 uppercase tracking-wider">
               Response Preview
             </h3>
-            <pre className="text-xs font-mono text-zinc-400 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
-              {responseBody}
+            <pre className="text-xs font-mono text-zinc-400 whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+              {(() => {
+                try {
+                  return JSON.stringify(JSON.parse(responseBody), null, 2);
+                } catch {
+                  return responseBody;
+                }
+              })()}
             </pre>
           </div>
         )}

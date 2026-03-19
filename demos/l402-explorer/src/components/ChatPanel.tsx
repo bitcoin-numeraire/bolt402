@@ -53,6 +53,8 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
+
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput } =
     useChat({
       api: '/api/chat',
@@ -66,7 +68,12 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
           categories: s.categories.map((c) => ({ name: c.name })),
         })),
       },
+      onError(err) {
+        console.error('[chat] Error:', err);
+        setError(err.message || 'Something went wrong. Check that OPENAI_API_KEY is set in .env.local.');
+      },
       onToolCall({ toolCall }) {
+        setError(null);
         // Track spending from tool calls
         if (toolCall.toolName === 'l402_fetch') {
           // We track spending when the result comes back via onFinish
@@ -219,6 +226,12 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
                 <div className="h-1.5 w-1.5 rounded-full bg-[#F7931A] animate-bounce [animation-delay:300ms]" />
               </div>
             </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mx-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+            <span className="font-medium">Error:</span> {error}
           </div>
         )}
 

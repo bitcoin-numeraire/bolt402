@@ -8,8 +8,19 @@ import {
 } from '@/lib/bolt402';
 import { MockBackend } from '@/lib/mock-backend';
 
-function createBackend(): LnBackend {
+function getConfig() {
   const backendType = process.env.BACKEND_TYPE || 'mock';
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const lndUrl = process.env.LND_URL || '(not set)';
+  const swissKnifeUrl = process.env.SWISSKNIFE_URL || '(not set)';
+  const satringUrl = process.env.SATRING_API_URL || 'https://satring.com/api/v1';
+
+  return { backendType, model, hasOpenAIKey, lndUrl, swissKnifeUrl, satringUrl };
+}
+
+function createBackend(): LnBackend {
+  const { backendType } = getConfig();
 
   if (backendType === 'lnd' && process.env.LND_URL && process.env.LND_MACAROON) {
     return new LndBackend({
@@ -58,24 +69,53 @@ When presenting data, use markdown formatting for clarity. If you receive JSON d
 }
 
 export async function POST(req: Request) {
-  const { messages, services } = await req.json();
+  const config = getConfig();
 
-  const backend = createBackend();
-  const tools = createBolt402Tools({
-    backend,
-    budget: { perRequestMax: 1000, dailyMax: 50000 },
-    maxFeeSats: 100,
+  // Log config on each request (non-sensitive info only)
+  console.log('[bolt402-chat]', {
+    backend: config.backendType,
+    model: config.model,
+    openaiKeySet: config.hasOpenAIKey,
+    lndUrl: config.backendType === 'lnd' ? config.lndUrl : undefined,
+    swissKnifeUrl: config.backendType === 'swissknife' ? config.swissKnifeUrl : undefined,
+    satringApi: config.satringUrl,
   });
 
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  if (!config.hasOpenAIKey) {
+    return new Response(
+      JSON.stringify({
+        error: 'OPENAI_API_KEY is not set. Add it to .env.local to enable the AI chat.',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 
-  const result = streamText({
-    model: openai(model),
-    system: buildSystemPrompt(services || []),
-    messages,
-    tools,
-    maxSteps: 5,
-  });
+  try {
+    const { messages, services } = await req.json();
 
-  return result.toDataStreamResponse();
+    const backend = createBackend();
+    const tools = createBolt402Tools({
+      backend,
+      budget: { perRequestMax: 1000, dailyMax: 50000 },
+      maxFeeSats: 100,
+    });
+
+    const result = streamText({
+      model: openai(config.model),
+      system: buildSystemPrompt(services || []),
+      messages,
+      tools,
+      maxSteps: 5,
+    });
+
+    return result.toDataStreamResponse();
+  } catch (error) {
+    console.error('[bolt402-chat] Error:', error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : 'Internal server error',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 }
