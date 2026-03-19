@@ -1,4 +1,4 @@
-import type { LnBackend, NodeInfo, PaymentResult } from '@/lib/bolt402';
+import type { LnBackend, NodeInfo, PaymentResult } from 'bolt402-ai-sdk';
 
 /**
  * Mock Lightning backend for demo purposes.

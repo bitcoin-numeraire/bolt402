@@ -17,7 +17,7 @@ The AI agent uses `createBolt402Tools()` from bolt402-ai-sdk, which gives it:
 
 - Node.js 20+
 - [Corepack](https://yarnpkg.com/corepack) enabled (`corepack enable`)
-- An OpenAI API key (for the AI chat)
+- An AI provider API key (Anthropic, xAI, or OpenAI)
 - A Lightning backend (LND, SwissKnife, or use mock mode)
 
 ## Quick start
@@ -28,7 +28,7 @@ yarn install
 
 # Copy and configure environment variables
 cp .env.example .env.local
-# ⚠️  You MUST set OPENAI_API_KEY in .env.local for the AI chat to work.
+# Edit .env.local — set at least one AI provider API key.
 # The demo defaults to mock mode (simulated Lightning payments).
 
 # Run in development mode
@@ -41,15 +41,13 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Create `.env.local` from `.env.example`:
 
+Pick ONE AI provider (auto-detected, priority: Anthropic > xAI > OpenAI):
+
 ```bash
-# Pick ONE AI provider (auto-detected, priority: Anthropic > xAI > OpenAI)
 ANTHROPIC_API_KEY=sk-ant-...   # Claude
 # XAI_API_KEY=xai-...          # Grok
 # OPENAI_API_KEY=sk-...        # GPT
 # AI_MODEL=claude-sonnet-4-20250514  # optional model override
-
-# Lightning backend: lnd | swissknife | mock
-BACKEND_TYPE=mock             # default: mock (simulated payments, no real Lightning)
 ```
 
 ### Connecting LND
@@ -129,16 +127,6 @@ demos/l402-explorer/
 │   │   ├── ProtocolFlow.tsx          # Protocol flow visualization modal
 │   │   └── SpendingDashboard.tsx     # Payment receipt tracker
 │   └── lib/
-│       ├── bolt402/                  # bolt402-ai-sdk (vendored source)
-│       │   ├── index.ts
-│       │   ├── l402-client.ts        # L402 protocol engine
-│       │   ├── tools.ts              # createBolt402Tools() for Vercel AI SDK
-│       │   ├── budget.ts             # Spending limits
-│       │   ├── token-store.ts        # Token caching
-│       │   ├── types.ts
-│       │   └── backends/
-│       │       ├── lnd.ts            # LND REST API backend
-│       │       └── swissknife.ts     # SwissKnife API backend
 │       ├── mock-backend.ts           # Mock backend for demo mode
 │       ├── satring.ts                # satring.com API client
 │       └── types.ts                  # UI type definitions
@@ -148,12 +136,14 @@ demos/l402-explorer/
 └── tsconfig.json
 ```
 
+bolt402-ai-sdk is linked from `../../packages/bolt402-ai-sdk` via `file:` dependency.
+
 ## How bolt402 is used
 
 The chat API route (`/api/chat`) creates bolt402 tools and passes them to the Vercel AI SDK:
 
 ```typescript
-import { createBolt402Tools, LndBackend } from '@/lib/bolt402';
+import { createBolt402Tools, LndBackend } from 'bolt402-ai-sdk';
 import { streamText } from 'ai';
 
 const tools = createBolt402Tools({
