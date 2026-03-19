@@ -20,8 +20,7 @@ bolt402/
 │   │                      # Ports: LnBackend, TokenStore (trait definitions)
 │   │                      # Adapters: InMemoryTokenStore, BudgetTracker
 │   ├── bolt402-lnd/       # LND gRPC backend adapter
-│   ├── bolt402-mock/      # Mock L402 server for testing and development
-│   └── bolt402-mcp/       # MCP server binary for universal AI agent integration
+│   └── bolt402-mock/      # Mock L402 server for testing and development
 ├── AGENTS.md              # This file
 ├── CLAUDE.md              # Instructions for Claude Code / Codex agents
 ├── PROJECT.md             # Project brief, initial request, status tracker
@@ -37,7 +36,6 @@ bolt402-proto  (no internal deps, shared protocol types)
 bolt402-core   (depends on proto: client engine, ports, adapters)
      ↑
 bolt402-lnd    (depends on core: implements LnBackend for LND)
-bolt402-mcp    (depends on core, lnd, mock: MCP server binary)
 
 bolt402-mock   (depends on proto: standalone mock L402 server)
 ```
