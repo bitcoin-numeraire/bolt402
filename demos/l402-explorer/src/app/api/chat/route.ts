@@ -5,11 +5,11 @@ import { openai } from '@ai-sdk/openai';
 import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 import { xai } from '@ai-sdk/xai';
 import {
-  createBolt402Tools,
   LndBackend,
   SwissKnifeBackend,
   type LnBackend,
 } from 'bolt402-ai-sdk';
+import { createBolt402ToolsV6 } from '@/lib/bolt402-tools';
 import { MockBackend } from '@/lib/mock-backend';
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ export async function POST(req: Request) {
 
     // Get bolt402 payment tools
     const backend = createBackend();
-    const bolt402Tools = createBolt402Tools({
+    const bolt402Tools = createBolt402ToolsV6({
       backend,
       budget: { perRequestMax: 1000, dailyMax: 50000 },
       maxFeeSats: 100,
