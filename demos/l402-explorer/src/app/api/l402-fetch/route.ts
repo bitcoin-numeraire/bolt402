@@ -4,7 +4,7 @@ import {
   LndBackend,
   SwissKnifeBackend,
   type LnBackend,
-} from '@/lib/bolt402';
+} from 'bolt402-ai-sdk';
 import { MockBackend } from '@/lib/mock-backend';
 
 function createBackend(): LnBackend {

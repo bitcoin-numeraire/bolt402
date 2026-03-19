@@ -7,12 +7,13 @@ import {
   LndBackend,
   SwissKnifeBackend,
   type LnBackend,
-} from '@/lib/bolt402';
+} from 'bolt402-ai-sdk';
 import { MockBackend } from '@/lib/mock-backend';
 
 type Provider = 'openai' | 'anthropic' | 'xai';
 
 function detectProvider(): { provider: Provider; model: string; apiKeySet: boolean } {
+  // Auto-detect provider from environment (priority: Anthropic > xAI > OpenAI)
   if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) {
     return {
       provider: 'anthropic',
@@ -153,20 +154,11 @@ When presenting data, use markdown formatting for clarity. If you receive JSON d
 export async function POST(req: Request) {
   const config = getConfig();
 
-  console.log('[bolt402-chat]', {
-    provider: config.provider,
-    model: config.model,
-    backend: config.backendType,
-    apiKeySet: config.apiKeySet,
-    lndUrl: config.backendType === 'lnd' ? config.lndUrl : undefined,
-    swissKnifeUrl: config.backendType === 'swissknife' ? config.swissKnifeUrl : undefined,
-    satringApi: config.satringUrl,
-  });
-
   if (!config.apiKeySet) {
     return new Response(
       JSON.stringify({
-        error: 'No AI provider API key set. Add ANTHROPIC_API_KEY, OPENAI_API_KEY, or XAI_API_KEY to .env.local.',
+        error:
+          'No AI provider API key configured. Add ANTHROPIC_API_KEY, XAI_API_KEY, or OPENAI_API_KEY to .env.local.',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
