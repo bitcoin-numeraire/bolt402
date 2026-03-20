@@ -58,7 +58,7 @@ bolt402-swissknife = { path = "crates/bolt402-swissknife" }
 tokio = { version = "1", features = ["full"] }
 
 # HTTP
-reqwest = { version = "0.13", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
