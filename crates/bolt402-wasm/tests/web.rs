@@ -228,7 +228,7 @@ fn insufficient_balance_fails() {
 #[wasm_bindgen_test]
 fn parse_l402_challenge_valid() {
     let header = r#"L402 macaroon="YWJjZGVm", invoice="lnbc100n1pj9nr7mpp5test""#;
-    let result = parseL402Challenge(header).unwrap();
+    let result = parse_l402_challenge(header).unwrap();
 
     let macaroon = js_sys::Reflect::get(&result, &JsValue::from_str("macaroon")).unwrap();
     let invoice = js_sys::Reflect::get(&result, &JsValue::from_str("invoice")).unwrap();
@@ -239,13 +239,13 @@ fn parse_l402_challenge_valid() {
 
 #[wasm_bindgen_test]
 fn parse_l402_challenge_invalid() {
-    let result = parseL402Challenge("invalid header");
+    let result = parse_l402_challenge("invalid header");
     assert!(result.is_err());
 }
 
 #[wasm_bindgen_test]
 fn build_l402_header_test() {
-    let header = buildL402Header("YWJjZGVm", "abcdef1234567890");
+    let header = build_l402_header("YWJjZGVm", "abcdef1234567890");
     assert_eq!(header, "L402 YWJjZGVm:abcdef1234567890");
 }
 
