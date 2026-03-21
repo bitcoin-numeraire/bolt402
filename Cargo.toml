@@ -7,6 +7,7 @@ members = [
     "crates/bolt402-mock",
     "crates/bolt402-swissknife",
     "crates/bolt402-sqlite",
+    "crates/bolt402-nwc",
     "crates/bolt402-ffi",
     "crates/bolt402-python",
     "crates/bolt402-wasm",
@@ -24,6 +25,7 @@ default-members = [
     "crates/bolt402-mock",
     "crates/bolt402-swissknife",
     "crates/bolt402-sqlite",
+    "crates/bolt402-nwc",
     "examples/basic-mock",
     "examples/budget-control",
 ]
@@ -60,6 +62,7 @@ bolt402-lnd = { path = "crates/bolt402-lnd" }
 bolt402-mock = { path = "crates/bolt402-mock" }
 bolt402-swissknife = { path = "crates/bolt402-swissknife" }
 bolt402-sqlite = { path = "crates/bolt402-sqlite" }
+bolt402-nwc = { path = "crates/bolt402-nwc" }
 bolt402-ffi = { path = "crates/bolt402-ffi" }
 
 # Async runtime
