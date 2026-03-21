@@ -99,14 +99,9 @@ export class LndBackend implements LnBackend {
     const crypto = await import('crypto');
     const computedHash = crypto.createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex');
     if (computedHash !== paymentHash) {
-      console.warn(
-        `[bolt402-lnd] WARNING: preimage->hash mismatch after normalization. ` +
-        `preimage=${preimage.slice(0, 16)}... computedHash=${computedHash.slice(0, 16)}... ` +
-        `paymentHash=${paymentHash.slice(0, 16)}... raw preimage="${preimageRaw.slice(0, 24)}" ` +
-        `raw hash="${hashRaw.slice(0, 24)}"`
+      throw new Error(
+        `Preimage verification failed: SHA256(preimage) does not match payment hash`,
       );
-    } else {
-      console.log(`[bolt402-lnd] Preimage verified OK (SHA256 matches payment hash)`);
     }
 
     return {

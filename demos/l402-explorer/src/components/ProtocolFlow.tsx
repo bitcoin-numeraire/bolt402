@@ -41,8 +41,6 @@ export default function ProtocolFlow({ service, onClose }: ProtocolFlowProps) {
     );
     await new Promise((r) => setTimeout(r, 600));
 
-    const startTime = Date.now();
-
     try {
       const res = await fetch('/api/l402-fetch', {
         method: 'POST',
@@ -51,7 +49,6 @@ export default function ProtocolFlow({ service, onClose }: ProtocolFlowProps) {
       });
 
       const data = await res.json();
-      const latencyMs = Date.now() - startTime;
 
       // Mark request complete
       setSteps((s) =>

@@ -135,22 +135,11 @@ export class L402Client {
     // Pay the invoice
     const payment = await this.backend.payInvoice(challenge.invoice, this.maxFeeSats);
 
-    console.log('[bolt402] Payment completed:', {
-      preimage: payment.preimage.slice(0, 16) + '...',
-      paymentHash: payment.paymentHash.slice(0, 16) + '...',
-      amountSats: payment.amountSats,
-    });
-
     // Check budget (using actual amount from payment result)
     this.budgetTracker.checkAndRecord(payment.amountSats + payment.feeSats);
 
     // Cache the token
     await this.tokenStore.put(url, challenge.macaroon, payment.preimage);
-
-    console.log('[bolt402] Retrying with L402 token:', {
-      macaroonPrefix: challenge.macaroon.slice(0, 20) + '...',
-      preimage: payment.preimage.slice(0, 16) + '...',
-    });
 
     // Retry with auth
     const retryResponse = await this.sendWithAuth(

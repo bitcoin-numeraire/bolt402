@@ -1686,11 +1686,11 @@ __metadata:
 
 "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk::locator=l402-explorer%40workspace%3A.":
   version: 0.1.0
-  resolution: "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk#../../packages/bolt402-ai-sdk::hash=0f6b48&locator=l402-explorer%40workspace%3A."
+  resolution: "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk#../../packages/bolt402-ai-sdk::hash=abfe98&locator=l402-explorer%40workspace%3A."
   peerDependencies:
     ai: ">=6.0.0"
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/eb638ab58b965ba51b165a64751f7f3cecc7454c085e2d6c709289d7e5be62b79136e559544629248c98fd4749e19aa83fae6443b4d8e913caf4ecbd96ed3b5e
+  checksum: 10c0/171f3486ff9a28105c4ba5ae4f03ba187158149bf1dd9e3633bfdbc363f1562db8a47b26c16a923cadc65e64a3ccb6cb08acaaef89469c618f34b7f1a6cfd975
   languageName: node
   linkType: hard
 
