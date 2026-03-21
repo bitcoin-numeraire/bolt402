@@ -106,7 +106,7 @@ export class L402Client {
       const response = await this.sendWithAuth(url, method, options.body, options.headers, cached.macaroon, cached.preimage);
 
       if (response.status !== 402) {
-        return this.buildResponse(response, false, null);
+        return this.buildResponse(response, false, null, true);
       }
 
       // Token was rejected, remove from cache
@@ -135,11 +135,22 @@ export class L402Client {
     // Pay the invoice
     const payment = await this.backend.payInvoice(challenge.invoice, this.maxFeeSats);
 
+    console.log('[bolt402] Payment completed:', {
+      preimage: payment.preimage.slice(0, 16) + '...',
+      paymentHash: payment.paymentHash.slice(0, 16) + '...',
+      amountSats: payment.amountSats,
+    });
+
     // Check budget (using actual amount from payment result)
     this.budgetTracker.checkAndRecord(payment.amountSats + payment.feeSats);
 
     // Cache the token
     await this.tokenStore.put(url, challenge.macaroon, payment.preimage);
+
+    console.log('[bolt402] Retrying with L402 token:', {
+      macaroonPrefix: challenge.macaroon.slice(0, 20) + '...',
+      preimage: payment.preimage.slice(0, 16) + '...',
+    });
 
     // Retry with auth
     const retryResponse = await this.sendWithAuth(
@@ -153,7 +164,8 @@ export class L402Client {
 
     if (retryResponse.status === 402) {
       await this.tokenStore.remove(url);
-      throw new L402Error('Server returned 402 again after payment');
+      const retryBody = await retryResponse.clone().text().catch(() => '');
+      throw new L402Error(`Server returned 402 again after payment. Response: ${retryBody.slice(0, 300)}`);
     }
 
     const latencyMs = Date.now() - startTime;
@@ -242,6 +254,7 @@ export class L402Client {
     response: Response,
     paid: boolean,
     receipt: Receipt | null,
+    cachedToken = false,
   ): Promise<L402Response> {
     const headers: Record<string, string> = {};
     response.headers.forEach((value, key) => {
@@ -256,6 +269,7 @@ export class L402Client {
       body: bodyText,
       paid,
       receipt,
+      cachedToken,
     };
   }
 }
