@@ -22,6 +22,7 @@ bolt402/
 │   ├── bolt402-lnd/       # LND gRPC backend adapter
 │   ├── bolt402-mock/      # Mock L402 server for testing and development
 │   ├── bolt402-swissknife/# SwissKnife REST API backend adapter
+│   ├── bolt402-sqlite/    # SQLite persistent token store adapter
 │   ├── bolt402-ffi/       # C-compatible FFI layer (cdylib/staticlib)
 │   ├── bolt402-python/    # Python bindings via PyO3
 │   └── bolt402-wasm/      # WebAssembly bindings via wasm-pack
@@ -46,6 +47,8 @@ bolt402-core   (depends on proto: client engine, ports, adapters)
 bolt402-lnd    (depends on core: implements LnBackend for LND)
 
 bolt402-mock   (depends on proto: standalone mock L402 server)
+
+bolt402-sqlite (depends on core: SQLite TokenStore adapter)
 
 bolt402-ffi    (depends on core + mock: C ABI for FFI bindings)
      ↑
