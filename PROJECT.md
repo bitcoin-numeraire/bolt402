@@ -70,5 +70,11 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] bolt402-sqlite: SQLite persistent token store — Issue #47 / PR #48
 - [x] bolt402-nwc: Nostr Wallet Connect (NIP-47) backend — Issue #50 / PR #51
 - [x] bolt402-cln: Core Lightning (CLN) gRPC backend adapter — Issue #52 / PR #53
+- [x] README roadmap updated to reflect all completed features — Issue #54 / PR #56
+
+- [x] bolt402-langchain: LangChain Python integration package — Issue #55 / PR #57 (pending)
+
+### Next Up
+- [ ] (Backlog empty — create new issues for next features)
 
 **Note on signed commits**: Repo ruleset requires signed commits on `main`. Workaround: push unsigned commits to feature branches, create PRs, squash-merge via GitHub (GitHub signs the merge commit automatically).
