@@ -18,7 +18,7 @@ bolt402/
 │   ├── bolt402-proto/     # L402 protocol types, challenge parsing, token construction
 │   ├── bolt402-core/      # Client SDK core: L402 engine, cache, budget, receipts
 │   │                      # Ports: LnBackend, TokenStore (trait definitions)
-│   │                      # Adapters: InMemoryTokenStore, BudgetTracker
+│   │                      # Adapters: InMemoryTokenStore, BudgetTracker, FailoverBackend
 │   ├── bolt402-lnd/       # LND gRPC backend adapter
 │   ├── bolt402-nwc/       # Nostr Wallet Connect (NIP-47) backend adapter
 │   ├── bolt402-cln/       # Core Lightning (CLN) gRPC backend adapter

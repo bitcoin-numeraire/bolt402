@@ -48,6 +48,9 @@
 /// Budget tracking for L402 payments with per-request, hourly, daily, and total limits.
 pub mod budget;
 
+/// Multi-backend failover adapter with circuit breaker health tracking.
+pub mod failover;
+
 /// In-memory LRU token cache.
 pub mod cache;
 

@@ -49,4 +49,25 @@ pub enum ClientError {
         /// Description of the backend error.
         reason: String,
     },
+
+    /// All backends in a failover chain failed.
+    #[error("all backends failed: {reason}")]
+    AllBackendsFailed {
+        /// Description of the combined failure.
+        reason: String,
+    },
+}
+
+impl ClientError {
+    /// Whether this error should trigger failover to the next backend.
+    ///
+    /// Infrastructure errors (backend unreachable, payment failed due to
+    /// liquidity) trigger failover. Application-level errors (budget exceeded,
+    /// invoice expired, protocol parsing) do not.
+    pub fn is_failover_eligible(&self) -> bool {
+        matches!(
+            self,
+            Self::Backend { .. } | Self::PaymentFailed { .. } | Self::Http(..)
+        )
+    }
 }

@@ -31,6 +31,7 @@ bolt402 fills that gap.
 │  ├── NWC (Nostr Wallet Connect)     │
 │  ├── SwissKnife (REST)              │
 │  ├── Mock (testing)                 │
+│  ├── Failover (multi-backend chain) │
 │  └── Custom (implement LnBackend)   │
 └─────────────────────────────────────┘
 ```
@@ -145,6 +146,41 @@ assert!(response.paid());
 
 See the [Getting Started tutorial](docs/tutorials/getting-started.md) for a full walkthrough.
 
+## Multi-Backend Failover
+
+Use `FailoverBackend` for production resilience. If your primary node goes down, payments automatically fall back to the next backend:
+
+```rust
+use bolt402_core::failover::{FailoverBackend, FailoverConfig};
+use bolt402_core::{L402Client, budget::Budget};
+use bolt402_core::cache::InMemoryTokenStore;
+use std::time::Duration;
+
+// Primary: LND, Fallback: CLN, Last resort: NWC
+let failover = FailoverBackend::builder()
+    .add_backend(lnd_backend)
+    .add_backend(cln_backend)
+    .add_backend(nwc_backend)
+    .config(FailoverConfig {
+        failure_threshold: 3,       // 3 consecutive failures → skip backend
+        recovery_timeout: Duration::from_secs(300), // retry after 5 min
+    })
+    .build()
+    .unwrap();
+
+let client = L402Client::builder()
+    .ln_backend(failover)
+    .token_store(InMemoryTokenStore::default())
+    .budget(Budget::unlimited())
+    .build()
+    .unwrap();
+
+// If LND is down, this transparently falls back to CLN
+let response = client.get("https://api.example.com/resource").await.unwrap();
+```
+
+The circuit breaker pattern ensures unhealthy backends are skipped (no wasted time on dead nodes) and automatically probed for recovery.
+
 ## Examples
 
 | Example | Description | Run |
@@ -196,16 +232,15 @@ cargo doc --no-deps  # Build docs
 - [x] AI Research Agent demo
 - [x] bolt402 vs lnget comparison page
 - [x] Comprehensive documentation and tutorials
+- [x] Multi-backend failover with circuit breaker
 
 ### Upcoming
 
-- [ ] LangChain / LlamaIndex Python integration
 - [ ] CrewAI agent toolkit integration
 - [ ] TypeScript bindings via napi-rs (native Node.js addon)
 - [ ] Package publishing (crates.io, PyPI, npm)
 - [ ] OpenAPI / Swagger integration examples
 - [ ] Streaming payment support (pay-per-token)
-- [ ] Multi-backend failover (fallback chain)
 
 ## License
 
