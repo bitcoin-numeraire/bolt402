@@ -299,7 +299,7 @@ mod tests {
     #[test]
     fn debug_format() {
         // Verify debug output includes address but not sensitive data.
-        let display = format!("ClnBackend {{ address: \"https://localhost:9736\", .. }}");
+        let display = "ClnBackend { address: \"https://localhost:9736\", .. }".to_string();
         assert!(display.contains("localhost:9736"));
     }
 }
