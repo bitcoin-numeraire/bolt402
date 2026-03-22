@@ -31,7 +31,8 @@ bolt402/
 ├── bindings/
 │   └── bolt402-go/        # Go bindings via CGo
 ├── packages/
-│   └── bolt402-ai-sdk/    # TypeScript/Vercel AI SDK integration
+│   ├── bolt402-ai-sdk/    # TypeScript/Vercel AI SDK integration
+│   └── bolt402-langchain/ # Python/LangChain integration
 ├── AGENTS.md              # This file
 ├── CLAUDE.md              # Instructions for Claude Code / Codex agents
 ├── PROJECT.md             # Project brief, initial request, status tracker

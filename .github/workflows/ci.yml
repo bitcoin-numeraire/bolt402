@@ -113,6 +113,30 @@ jobs:
       - name: Run WASM browser tests
         run: wasm-pack test --headless --chrome crates/bolt402-wasm
 
+  langchain:
+    name: LangChain Integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get install -y protobuf-compiler
+      - name: Build Python bindings
+        working-directory: crates/bolt402-python
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install maturin pytest
+          .venv/bin/maturin develop
+      - name: Install bolt402-langchain
+        working-directory: crates/bolt402-python
+        run: .venv/bin/pip install -e ../../packages/bolt402-langchain
+      - name: Run LangChain tests
+        working-directory: crates/bolt402-python
+        run: .venv/bin/pytest ../../packages/bolt402-langchain/tests/ -v
+
   typescript:
     name: TypeScript (bolt402-ai-sdk)
     runs-on: ubuntu-latest
