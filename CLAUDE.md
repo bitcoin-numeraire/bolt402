@@ -2,26 +2,50 @@
 
 ## Project
 
-bolt402: L402 client SDK for AI agent frameworks. Rust workspace.
+bolt402: L402 client SDK for AI agent frameworks. Rust workspace with TypeScript and Python packages.
 
 ## Quick Start
 
 ```bash
-cargo build          # Build all crates
-cargo test           # Run all tests
+cargo build          # Build all Rust crates
+cargo test           # Run all Rust tests
 cargo fmt --check    # Check formatting
 cargo clippy         # Lint
 cargo doc --no-deps  # Build docs
+
+# TypeScript (Vercel AI SDK)
+cd packages/bolt402-ai-sdk && yarn install && yarn test
+
+# Python (LangChain)
+cd packages/bolt402-langchain && pip install -e ".[dev]" && pytest
 ```
 
 ## Architecture
 
 Hexagonal / Clean Architecture. Read `AGENTS.md` for the full breakdown.
 
+### Rust Crates
+
 - `bolt402-proto`: Protocol types (L402Challenge, L402Token, L402Error). No internal deps.
 - `bolt402-core`: Client engine, ports (LnBackend, TokenStore traits), adapters (InMemoryTokenStore, BudgetTracker, Receipt).
 - `bolt402-lnd`: LND gRPC adapter (implements LnBackend).
+- `bolt402-cln`: CLN (Core Lightning) gRPC adapter (implements LnBackend).
+- `bolt402-nwc`: Nostr Wallet Connect (NIP-47) adapter (implements LnBackend).
+- `bolt402-swissknife`: SwissKnife REST adapter (implements LnBackend).
 - `bolt402-mock`: Mock L402 server for testing.
+- `bolt402-sqlite`: SQLite persistent token store (implements TokenStore).
+- `bolt402-ffi`: C-compatible FFI layer for cross-language bindings.
+- `bolt402-python`: Python bindings via PyO3/maturin.
+- `bolt402-wasm`: WebAssembly bindings via wasm-pack.
+
+### Bindings
+
+- `bindings/bolt402-go`: Go bindings via CGo + bolt402-ffi.
+
+### Packages (non-Rust)
+
+- `packages/bolt402-ai-sdk`: Vercel AI SDK tools (TypeScript, yarn).
+- `packages/bolt402-langchain`: LangChain Python tools (L402FetchTool, L402BudgetTool, PaymentCallbackHandler).
 
 ## Rules
 
@@ -35,6 +59,8 @@ Hexagonal / Clean Architecture. Read `AGENTS.md` for the full breakdown.
 8. **Error handling:** `thiserror` for typed errors. No `unwrap()` in library code. No `anyhow` in library crates.
 9. **Async:** All port traits use `async_trait`. Adapters use `tokio`.
 10. **Format:** Run `cargo fmt` before committing. Run `cargo clippy` and fix all warnings.
+11. **Use yarn** for TypeScript/Node.js packages (not npm).
+12. **Never merge PRs autonomously in cron jobs.** Open PRs, leave for review.
 
 ## Dependencies (workspace-level)
 
@@ -55,3 +81,4 @@ Check `Cargo.toml` at workspace root for pinned versions. Don't add new dependen
 - Don't add feature flags unless architecturally necessary
 - Don't break the public API without discussion
 - Don't commit generated files (target/, *.lock for libraries)
+- Don't build standalone binaries (MCP server, CLI) — bolt402 is a library/SDK

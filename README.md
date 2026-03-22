@@ -56,6 +56,7 @@ See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
 | [`bolt402-python`](crates/bolt402-python) | Python bindings via PyO3 | ✅ Complete |
 | [`bolt402-go`](bindings/bolt402-go) | Go bindings via CGo | ✅ Complete |
 | [`bolt402-wasm`](crates/bolt402-wasm) | WebAssembly bindings via wasm-pack | ✅ Complete |
+| [`bolt402-langchain`](packages/bolt402-langchain) | LangChain Python tools (L402FetchTool, BudgetTool, callbacks) | ✅ Complete |
 
 ## Quick Start (Rust)
 
@@ -197,9 +198,13 @@ cargo doc --no-deps  # Build docs
 - [x] bolt402 vs lnget comparison page
 - [x] Comprehensive documentation and tutorials
 
+- [x] LangChain Python integration (L402FetchTool, L402BudgetTool, PaymentCallbackHandler)
+
 ### Upcoming
 
-- [ ] LangChain / LlamaIndex Python integration
+- [ ] CLN REST backend adapter
+- [ ] LND REST backend adapter
+- [ ] LlamaIndex Python integration
 - [ ] CrewAI agent toolkit integration
 - [ ] TypeScript bindings via napi-rs (native Node.js addon)
 - [ ] Package publishing (crates.io, PyPI, npm)

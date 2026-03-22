@@ -2,7 +2,7 @@
 
 ## Overview
 
-bolt402 is an L402 client SDK for AI agent frameworks. It enables programmatic Lightning payments for L402-gated APIs, built in Rust with planned FFI bindings for Python, TypeScript, Go, and WASM.
+bolt402 is an L402 client SDK for AI agent frameworks. It enables programmatic Lightning payments for L402-gated APIs, built in Rust with FFI bindings for Python, Go, and WASM, plus native integrations for Vercel AI SDK and LangChain.
 
 **Maintainer:** Toshi (AI agent, via OpenClaw)
 **Owner:** Dario Anongba Varela <dario.anongba@gmail.com>
@@ -15,51 +15,61 @@ Hexagonal (ports & adapters) / Clean Architecture / Domain-Driven Design.
 ```
 bolt402/
 ├── crates/
-│   ├── bolt402-proto/     # L402 protocol types, challenge parsing, token construction
-│   ├── bolt402-core/      # Client SDK core: L402 engine, cache, budget, receipts
-│   │                      # Ports: LnBackend, TokenStore (trait definitions)
-│   │                      # Adapters: InMemoryTokenStore, BudgetTracker
-│   ├── bolt402-lnd/       # LND gRPC backend adapter
-│   ├── bolt402-nwc/       # Nostr Wallet Connect (NIP-47) backend adapter
-│   ├── bolt402-cln/       # Core Lightning (CLN) gRPC backend adapter
-│   ├── bolt402-mock/      # Mock L402 server for testing and development
-│   ├── bolt402-swissknife/# SwissKnife REST API backend adapter
-│   ├── bolt402-sqlite/    # SQLite persistent token store adapter
-│   ├── bolt402-ffi/       # C-compatible FFI layer (cdylib/staticlib)
-│   ├── bolt402-python/    # Python bindings via PyO3
-│   └── bolt402-wasm/      # WebAssembly bindings via wasm-pack
+│   ├── bolt402-proto/       # L402 protocol types, challenge parsing, token construction
+│   ├── bolt402-core/        # Client SDK core: L402 engine, cache, budget, receipts
+│   │                        # Ports: LnBackend, TokenStore (trait definitions)
+│   │                        # Adapters: InMemoryTokenStore, BudgetTracker
+│   ├── bolt402-lnd/         # LND gRPC backend adapter
+│   ├── bolt402-cln/         # CLN (Core Lightning) gRPC backend adapter
+│   ├── bolt402-nwc/         # Nostr Wallet Connect (NIP-47) backend adapter
+│   ├── bolt402-swissknife/  # SwissKnife REST backend adapter
+│   ├── bolt402-mock/        # Mock L402 server for testing and development
+│   ├── bolt402-sqlite/      # SQLite persistent token store
+│   ├── bolt402-ffi/         # C-compatible FFI layer for Go/Swift/Kotlin bindings
+│   ├── bolt402-python/      # Python bindings via PyO3/maturin
+│   └── bolt402-wasm/        # WebAssembly bindings via wasm-pack
 ├── bindings/
-│   └── bolt402-go/        # Go bindings via CGo
+│   └── bolt402-go/          # Go bindings via CGo + bolt402-ffi
 ├── packages/
-│   ├── bolt402-ai-sdk/    # TypeScript/Vercel AI SDK integration
-│   └── bolt402-langchain/ # Python/LangChain integration
-├── AGENTS.md              # This file
-├── CLAUDE.md              # Instructions for Claude Code / Codex agents
-├── PROJECT.md             # Project brief, initial request, status tracker
-├── Cargo.toml             # Workspace manifest
-└── ...
+│   ├── bolt402-ai-sdk/      # Vercel AI SDK tools (TypeScript)
+│   └── bolt402-langchain/   # LangChain Python integration
+├── demos/
+│   ├── l402-explorer/       # Interactive L402 web app (Next.js)
+│   └── comparison/          # bolt402 vs lnget comparison page
+├── examples/
+│   ├── basic-mock/          # Full L402 flow with mock server
+│   ├── budget-control/      # Budget limits and rejection
+│   ├── ai-agent/            # Vercel AI SDK + bolt402
+│   └── langchain/           # LangChain + bolt402
+├── docs/
+│   ├── architecture.md      # Hexagonal design, crate graph, protocol flow
+│   ├── design/              # Design documents (numbered)
+│   └── tutorials/           # Getting started, custom backend, budget control
+├── AGENTS.md                # This file
+├── CLAUDE.md                # Instructions for Claude Code / Codex agents
+├── PROJECT.md               # Project brief, initial request, status tracker
+├── CONTRIBUTING.md          # Development setup, coding standards, PR workflow
+├── CHANGELOG.md             # Release history
+└── Cargo.toml               # Workspace manifest
 ```
 
 ### Crate Dependency Graph
 
 ```
-bolt402-proto  (no internal deps, shared protocol types)
+bolt402-proto    (no internal deps, shared protocol types)
      ↑
-bolt402-core   (depends on proto: client engine, ports, adapters)
+bolt402-core     (depends on proto: client engine, ports, adapters)
      ↑
-bolt402-lnd    (depends on core: implements LnBackend for LND)
+├── bolt402-lnd         (implements LnBackend for LND gRPC)
+├── bolt402-cln         (implements LnBackend for CLN gRPC)
+├── bolt402-nwc         (implements LnBackend for Nostr Wallet Connect)
+├── bolt402-swissknife  (implements LnBackend for SwissKnife REST)
+├── bolt402-sqlite      (implements TokenStore with SQLite)
+├── bolt402-ffi         (C FFI layer exposing core API)
+├── bolt402-python      (PyO3 bindings)
+└── bolt402-wasm        (wasm-pack bindings)
 
-bolt402-nwc    (depends on core: implements LnBackend via NIP-47/NWC)
-
-bolt402-cln    (depends on core: implements LnBackend for CLN via gRPC)
-
-bolt402-mock   (depends on proto: standalone mock L402 server)
-
-bolt402-sqlite (depends on core: SQLite TokenStore adapter)
-
-bolt402-ffi    (depends on core + mock: C ABI for FFI bindings)
-     ↑
-bolt402-go     (CGo wrapper calling bolt402-ffi)
+bolt402-mock     (depends on proto: standalone mock L402 server)
 ```
 
 ### Design Principles
@@ -89,7 +99,9 @@ bolt402-go     (CGo wrapper calling bolt402-ffi)
 - Unit tests in each module (`#[cfg(test)] mod tests`)
 - Integration tests in `tests/` directory
 - `bolt402-mock` provides a mock L402 server for integration testing
-- CI runs: `cargo fmt --check`, `cargo clippy`, `cargo test`, `cargo doc`
+- Python: pytest for bolt402-langchain tests
+- TypeScript: vitest for bolt402-ai-sdk tests
+- CI runs: `cargo fmt --check`, `cargo clippy`, `cargo test`, `cargo doc`, FFI build, WASM build, Python tests, TypeScript tests, LangChain tests
 
 ### Code Style
 
@@ -109,6 +121,8 @@ See `CLAUDE.md` for specific instructions when working on this codebase.
 - **Dual license**: MIT OR Apache-2.0 (matches Rust ecosystem convention)
 - **Edition 2024**: Using latest Rust edition
 - **MSRV 1.85**: Minimum supported Rust version
+- **No autonomous merges in cron jobs**: Open PRs, leave for Dario's review
+- **No standalone binaries**: bolt402 is a library/SDK. MCP server, CLI tools belong elsewhere
 
 ## References
 
@@ -116,3 +130,4 @@ See `CLAUDE.md` for specific instructions when working on this codebase.
 - [Original proposal](../lnpay-proposal.md)
 - [Lightning Labs agent-kit](https://github.com/lightninglabs/agent-kit)
 - [Aperture (L402 reverse proxy)](https://github.com/lightninglabs/aperture)
+- [Numeraire Swissknife](https://github.com/bitcoin-numeraire/swissknife) — reference for CLN REST/LND REST adapters
