@@ -32,6 +32,9 @@
 //! console.log(response.receipt);   // { amountSats: 10, ... }
 //! ```
 
+/// Real Lightning backend wrappers (LND REST, SwissKnife).
+pub mod backends;
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 

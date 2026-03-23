@@ -3,8 +3,8 @@
 use std::fmt;
 
 use async_trait::async_trait;
-use bolt402_core::ClientError;
-use bolt402_core::port::{LnBackend, NodeInfo, PaymentResult};
+use bolt402_proto::ClientError;
+use bolt402_proto::{LnBackend, NodeInfo, PaymentResult};
 use tonic::Request;
 use tonic::transport::{Certificate, Channel, ClientTlsConfig};
 

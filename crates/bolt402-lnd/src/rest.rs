@@ -16,7 +16,7 @@
 //!
 //! ```rust,no_run
 //! use bolt402_lnd::LndRestBackend;
-//! use bolt402_core::LnBackend;
+//! use bolt402_proto::LnBackend;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let backend = LndRestBackend::new(
@@ -35,8 +35,8 @@ use std::fmt;
 use async_trait::async_trait;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use bolt402_core::ClientError;
-use bolt402_core::port::{LnBackend, NodeInfo, PaymentResult};
+use bolt402_proto::ClientError;
+use bolt402_proto::{LnBackend, NodeInfo, PaymentResult};
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -47,6 +47,7 @@ use crate::error::LndError;
 ///
 /// Uses LND's REST API (grpc-gateway) to pay invoices, query balances,
 /// and retrieve node information. Authenticated via hex-encoded macaroon.
+#[derive(Clone)]
 pub struct LndRestBackend {
     client: HttpClient,
     url: String,
@@ -73,8 +74,10 @@ impl LndRestBackend {
     ///
     /// Returns [`LndError::Transport`] if the HTTP client cannot be built.
     pub fn new(url: &str, macaroon: &str) -> Result<Self, LndError> {
-        let client = HttpClient::builder()
-            .danger_accept_invalid_certs(true)
+        let builder = HttpClient::builder();
+        #[cfg(not(target_arch = "wasm32"))]
+        let builder = builder.danger_accept_invalid_certs(true);
+        let client = builder
             .build()
             .map_err(|e| LndError::Transport(format!("failed to build HTTP client: {e}")))?;
 
@@ -101,7 +104,7 @@ impl LndRestBackend {
     /// Reads from:
     /// - `LND_REST_URL` (default: `https://localhost:8080`)
     /// - `LND_MACAROON_HEX` - hex-encoded macaroon string (preferred)
-    /// - `LND_MACAROON_PATH` - path to binary macaroon file (fallback)
+    /// - `LND_MACAROON_PATH` - path to binary macaroon file (fallback, requires tokio)
     ///
     /// If both `LND_MACAROON_HEX` and `LND_MACAROON_PATH` are set,
     /// `LND_MACAROON_HEX` takes precedence.
@@ -110,6 +113,9 @@ impl LndRestBackend {
     ///
     /// Returns an error if neither macaroon variable is set, or if the
     /// macaroon file cannot be read.
+    ///
+    /// Not available on WASM targets (use `new()` instead).
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn from_env() -> Result<Self, LndError> {
         let url =
             std::env::var("LND_REST_URL").unwrap_or_else(|_| "https://localhost:8080".to_string());
@@ -294,7 +300,8 @@ fn verify_preimage(preimage_hex: &str, payment_hash_hex: &str) -> Result<(), Lnd
 // LnBackend implementation
 // ---------------------------------------------------------------------------
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl LnBackend for LndRestBackend {
     async fn pay_invoice(
         &self,

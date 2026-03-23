@@ -1,6 +1,6 @@
 //! Error types for the LND backend adapters.
 
-use bolt402_core::ClientError;
+use bolt402_proto::ClientError;
 
 /// Error type specific to the LND backend.
 #[derive(Debug, thiserror::Error)]

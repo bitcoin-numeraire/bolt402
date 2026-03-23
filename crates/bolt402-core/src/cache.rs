@@ -6,8 +6,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio::sync::RwLock;
 
-use crate::ClientError;
-use crate::port::TokenStore;
+use bolt402_proto::ClientError;
+use bolt402_proto::port::TokenStore;
 
 /// In-memory token cache with a maximum capacity.
 ///

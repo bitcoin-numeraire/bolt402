@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use crate::ClientError;
+use bolt402_proto::ClientError;
 
 /// Budget configuration with multiple limit granularities.
 #[derive(Debug, Clone, Serialize, Deserialize)]

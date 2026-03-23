@@ -53,8 +53,9 @@ use tokio::sync::RwLock;
 use bolt402_proto::{L402Challenge, L402Token, decode_bolt11_amount};
 
 use crate::budget::{Budget, BudgetTracker};
-use crate::error::ClientError;
-use crate::port::{LnBackend, TokenStore};
+use bolt402_proto::ClientError;
+use bolt402_proto::{LnBackend};
+use bolt402_proto::port::TokenStore;
 use crate::receipt::Receipt;
 
 /// Configuration for the [`L402Client`].
@@ -350,7 +351,7 @@ impl L402Client {
                 .body(body.to_string());
         }
 
-        Ok(builder.send().await?)
+        builder.send().await.map_err(|e| ClientError::Http { reason: e.to_string() })
     }
 
     /// Send an HTTP request with L402 authorization.
@@ -375,7 +376,7 @@ impl L402Client {
                 .body(body.to_string());
         }
 
-        Ok(builder.send().await?)
+        builder.send().await.map_err(|e| ClientError::Http { reason: e.to_string() })
     }
 
     /// Extract an L402 challenge from a 402 response.
@@ -433,7 +434,7 @@ impl L402Response {
     ///
     /// Returns [`ClientError::Http`] if reading the body fails.
     pub async fn text(self) -> Result<String, ClientError> {
-        Ok(self.inner.text().await?)
+        self.inner.text().await.map_err(|e| ClientError::Http { reason: e.to_string() })
     }
 
     /// Consume the response and read the body as bytes.
@@ -442,7 +443,7 @@ impl L402Response {
     ///
     /// Returns [`ClientError::Http`] if reading the body fails.
     pub async fn bytes(self) -> Result<bytes::Bytes, ClientError> {
-        Ok(self.inner.bytes().await?)
+        self.inner.bytes().await.map_err(|e| ClientError::Http { reason: e.to_string() })
     }
 
     /// Consume the response and deserialize the body as JSON.
@@ -451,7 +452,7 @@ impl L402Response {
     ///
     /// Returns [`ClientError::Http`] if reading or deserializing fails.
     pub async fn json<T: serde::de::DeserializeOwned>(self) -> Result<T, ClientError> {
-        Ok(self.inner.json().await?)
+        self.inner.json().await.map_err(|e| ClientError::Http { reason: e.to_string() })
     }
 
     /// Get a reference to the response headers.
@@ -464,7 +465,7 @@ impl L402Response {
 mod tests {
     use super::*;
     use crate::cache::InMemoryTokenStore;
-    use crate::port::{NodeInfo, PaymentResult};
+    use bolt402_proto::port::{NodeInfo, PaymentResult};
     use async_trait::async_trait;
     use std::sync::atomic::{AtomicU32, Ordering};
 
