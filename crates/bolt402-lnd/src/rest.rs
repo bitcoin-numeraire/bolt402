@@ -116,14 +116,14 @@ impl LndRestBackend {
     ///
     /// Not available on WASM targets (use `new()` instead).
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn from_env() -> Result<Self, LndError> {
+    pub fn from_env() -> Result<Self, LndError> {
         let url =
             std::env::var("LND_REST_URL").unwrap_or_else(|_| "https://localhost:8080".to_string());
 
         let macaroon = if let Ok(hex) = std::env::var("LND_MACAROON_HEX") {
             hex
         } else if let Ok(path) = std::env::var("LND_MACAROON_PATH") {
-            let bytes = tokio::fs::read(&path).await?;
+            let bytes = std::fs::read(&path)?;
             hex::encode(&bytes)
         } else {
             return Err(LndError::Payment(
@@ -205,11 +205,7 @@ impl PaymentUpdate {
     }
 
     fn fee_sats(&self) -> u64 {
-        if let Some(msat) = self
-            .fee_msat
-            .as_deref()
-            .or(self.fee_msat_camel.as_deref())
-        {
+        if let Some(msat) = self.fee_msat.as_deref().or(self.fee_msat_camel.as_deref()) {
             return msat.parse::<u64>().unwrap_or(0) / 1000;
         }
         self.fee_sat
@@ -280,8 +276,8 @@ fn bytes_field_to_hex(raw: &str) -> Result<String, LndError> {
 
 /// Verify that SHA-256(preimage) equals the payment hash.
 fn verify_preimage(preimage_hex: &str, payment_hash_hex: &str) -> Result<(), LndError> {
-    let preimage_bytes =
-        hex::decode(preimage_hex).map_err(|e| LndError::Deserialize(format!("invalid preimage hex: {e}")))?;
+    let preimage_bytes = hex::decode(preimage_hex)
+        .map_err(|e| LndError::Deserialize(format!("invalid preimage hex: {e}")))?;
 
     let mut hasher = Sha256::new();
     hasher.update(&preimage_bytes);
@@ -335,10 +331,16 @@ impl LnBackend for LndRestBackend {
         // Each line is a JSON object, possibly wrapped in {"result": ...}.
         // We scan from the last line backward to find the final SUCCEEDED update.
         let text = response.text().await.map_err(LndError::from)?;
-        let lines: Vec<&str> = text.trim().lines().filter(|l| !l.trim().is_empty()).collect();
+        let lines: Vec<&str> = text
+            .trim()
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .collect();
 
         if lines.is_empty() {
-            return Err(LndError::Payment("empty response from /v2/router/send".to_string()).into());
+            return Err(
+                LndError::Payment("empty response from /v2/router/send".to_string()).into(),
+            );
         }
 
         // Find the SUCCEEDED payment from the stream (scan backward)
@@ -398,12 +400,12 @@ impl LnBackend for LndRestBackend {
             }
         };
 
-        let preimage_raw = payment
-            .preimage()
-            .ok_or_else(|| LndError::Payment("payment succeeded but returned empty preimage".to_string()))?;
-        let hash_raw = payment
-            .hash()
-            .ok_or_else(|| LndError::Payment("payment succeeded but returned empty hash".to_string()))?;
+        let preimage_raw = payment.preimage().ok_or_else(|| {
+            LndError::Payment("payment succeeded but returned empty preimage".to_string())
+        })?;
+        let hash_raw = payment.hash().ok_or_else(|| {
+            LndError::Payment("payment succeeded but returned empty hash".to_string())
+        })?;
 
         let preimage = bytes_field_to_hex(preimage_raw).map_err(ClientError::from)?;
         let payment_hash = bytes_field_to_hex(hash_raw).map_err(ClientError::from)?;
@@ -467,9 +469,10 @@ impl LnBackend for LndRestBackend {
             return Err(LndError::Api { status, body }.into());
         }
 
-        let data: GetInfoResponse = response.json().await.map_err(|e| {
-            LndError::Deserialize(format!("failed to parse getinfo response: {e}"))
-        })?;
+        let data: GetInfoResponse = response
+            .json()
+            .await
+            .map_err(|e| LndError::Deserialize(format!("failed to parse getinfo response: {e}")))?;
 
         Ok(NodeInfo {
             pubkey: data.identity_pubkey.unwrap_or_default(),
@@ -611,7 +614,12 @@ mod tests {
         let json = r#"{"local_balance": {"sat": "500000"}}"#;
         let resp: ChannelBalanceResponse = serde_json::from_str(json).unwrap();
         assert_eq!(
-            resp.local_balance.unwrap().sat.unwrap().parse::<u64>().unwrap(),
+            resp.local_balance
+                .unwrap()
+                .sat
+                .unwrap()
+                .parse::<u64>()
+                .unwrap(),
             500_000
         );
     }

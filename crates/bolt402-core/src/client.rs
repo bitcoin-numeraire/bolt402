@@ -53,10 +53,10 @@ use tokio::sync::RwLock;
 use bolt402_proto::{L402Challenge, L402Token, decode_bolt11_amount};
 
 use crate::budget::{Budget, BudgetTracker};
-use bolt402_proto::ClientError;
-use bolt402_proto::{LnBackend};
-use bolt402_proto::port::TokenStore;
 use crate::receipt::Receipt;
+use bolt402_proto::ClientError;
+use bolt402_proto::LnBackend;
+use bolt402_proto::port::TokenStore;
 
 /// Configuration for the [`L402Client`].
 #[derive(Debug, Clone)]
@@ -351,7 +351,9 @@ impl L402Client {
                 .body(body.to_string());
         }
 
-        builder.send().await.map_err(|e| ClientError::Http { reason: e.to_string() })
+        builder.send().await.map_err(|e| ClientError::Http {
+            reason: e.to_string(),
+        })
     }
 
     /// Send an HTTP request with L402 authorization.
@@ -376,7 +378,9 @@ impl L402Client {
                 .body(body.to_string());
         }
 
-        builder.send().await.map_err(|e| ClientError::Http { reason: e.to_string() })
+        builder.send().await.map_err(|e| ClientError::Http {
+            reason: e.to_string(),
+        })
     }
 
     /// Extract an L402 challenge from a 402 response.
@@ -434,7 +438,9 @@ impl L402Response {
     ///
     /// Returns [`ClientError::Http`] if reading the body fails.
     pub async fn text(self) -> Result<String, ClientError> {
-        self.inner.text().await.map_err(|e| ClientError::Http { reason: e.to_string() })
+        self.inner.text().await.map_err(|e| ClientError::Http {
+            reason: e.to_string(),
+        })
     }
 
     /// Consume the response and read the body as bytes.
@@ -443,7 +449,9 @@ impl L402Response {
     ///
     /// Returns [`ClientError::Http`] if reading the body fails.
     pub async fn bytes(self) -> Result<bytes::Bytes, ClientError> {
-        self.inner.bytes().await.map_err(|e| ClientError::Http { reason: e.to_string() })
+        self.inner.bytes().await.map_err(|e| ClientError::Http {
+            reason: e.to_string(),
+        })
     }
 
     /// Consume the response and deserialize the body as JSON.
@@ -452,7 +460,9 @@ impl L402Response {
     ///
     /// Returns [`ClientError::Http`] if reading or deserializing fails.
     pub async fn json<T: serde::de::DeserializeOwned>(self) -> Result<T, ClientError> {
-        self.inner.json().await.map_err(|e| ClientError::Http { reason: e.to_string() })
+        self.inner.json().await.map_err(|e| ClientError::Http {
+            reason: e.to_string(),
+        })
     }
 
     /// Get a reference to the response headers.
@@ -465,8 +475,8 @@ impl L402Response {
 mod tests {
     use super::*;
     use crate::cache::InMemoryTokenStore;
-    use bolt402_proto::port::{NodeInfo, PaymentResult};
     use async_trait::async_trait;
+    use bolt402_proto::port::{NodeInfo, PaymentResult};
     use std::sync::atomic::{AtomicU32, Ordering};
 
     /// A mock Lightning backend that returns configurable results.

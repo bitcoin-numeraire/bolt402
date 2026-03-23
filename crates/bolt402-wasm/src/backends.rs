@@ -1,8 +1,7 @@
 //! WASM-bindgen wrappers for the real Lightning backends.
 //!
 //! Exposes `LndRestBackend` and `SwissKnifeBackend` from Rust to JavaScript
-//! via wasm-bindgen, so that `bolt402-ai-sdk` can use the Rust implementations
-//! directly instead of maintaining separate TypeScript clients.
+//! via wasm-bindgen, using proper typed structs (not `js_sys::Reflect`).
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
@@ -12,15 +11,75 @@ use bolt402_proto::LnBackend;
 use bolt402_swissknife::SwissKnifeBackend as RustSwissKnifeBackend;
 
 // ---------------------------------------------------------------------------
+// Shared WASM types
+// ---------------------------------------------------------------------------
+
+/// Result of a Lightning payment, returned from `payInvoice`.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct WasmPaymentResult {
+    preimage: String,
+    payment_hash: String,
+    #[wasm_bindgen(readonly, js_name = "amountSats")]
+    pub amount_sats: u64,
+    #[wasm_bindgen(readonly, js_name = "feeSats")]
+    pub fee_sats: u64,
+}
+
+#[wasm_bindgen]
+impl WasmPaymentResult {
+    /// Hex-encoded payment preimage (proof of payment).
+    #[wasm_bindgen(getter)]
+    pub fn preimage(&self) -> String {
+        self.preimage.clone()
+    }
+
+    /// Hex-encoded payment hash.
+    #[wasm_bindgen(getter, js_name = "paymentHash")]
+    pub fn payment_hash(&self) -> String {
+        self.payment_hash.clone()
+    }
+
+    /// Total cost (amount + fee) in satoshis.
+    #[wasm_bindgen(js_name = "totalCostSats")]
+    pub fn total_cost_sats(&self) -> u64 {
+        self.amount_sats + self.fee_sats
+    }
+}
+
+/// Information about a Lightning node, returned from `getInfo`.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct WasmNodeInfo {
+    pubkey: String,
+    alias: String,
+    #[wasm_bindgen(readonly, js_name = "numActiveChannels")]
+    pub num_active_channels: u32,
+}
+
+#[wasm_bindgen]
+impl WasmNodeInfo {
+    /// Node public key (hex-encoded).
+    #[wasm_bindgen(getter)]
+    pub fn pubkey(&self) -> String {
+        self.pubkey.clone()
+    }
+
+    /// Node alias.
+    #[wasm_bindgen(getter)]
+    pub fn alias(&self) -> String {
+        self.alias.clone()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // WasmLndRestBackend
 // ---------------------------------------------------------------------------
 
 /// LND REST backend for use in JavaScript/TypeScript.
 ///
 /// Wraps the Rust `LndRestBackend` which uses `reqwest` (compiled to
-/// browser `fetch` on WASM). This is the single implementation of the
-/// LND REST client, shared across TS, Python, and Go via their
-/// respective bindings.
+/// browser `fetch` on WASM).
 ///
 /// # Example
 ///
@@ -32,9 +91,6 @@ use bolt402_swissknife::SwissKnifeBackend as RustSwissKnifeBackend;
 /// const lnd = new WasmLndRestBackend("https://localhost:8080", "deadbeef...");
 /// const info = await lnd.getInfo();
 /// console.log(info.alias);
-///
-/// const result = await lnd.payInvoice("lnbc...", 100n);
-/// console.log(result.preimage);
 /// ```
 #[wasm_bindgen]
 pub struct WasmLndRestBackend {
@@ -56,22 +112,9 @@ impl WasmLndRestBackend {
         Ok(Self { inner })
     }
 
-    /// Create a new LND REST backend with a custom reqwest client.
-    ///
-    /// Useful for custom TLS settings or proxies.
-    #[wasm_bindgen(js_name = "withClient")]
-    pub fn with_client(
-        url: &str,
-        macaroon: &str,
-        // In WASM, we can't pass a reqwest::Client from JS,
-        // so this creates a default client.
-    ) -> Result<WasmLndRestBackend, JsError> {
-        Self::new(url, macaroon)
-    }
-
     /// Pay a BOLT11 Lightning invoice.
     ///
-    /// Returns a promise that resolves to `{ preimage, paymentHash, amountSats, feeSats }`.
+    /// Returns a `Promise<WasmPaymentResult>`.
     #[wasm_bindgen(js_name = "payInvoice")]
     pub fn pay_invoice(&self, bolt11: &str, max_fee_sats: u64) -> js_sys::Promise {
         let bolt11 = bolt11.to_string();
@@ -83,24 +126,18 @@ impl WasmLndRestBackend {
                 .await
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
 
-            let obj = js_sys::Object::new();
-            js_sys::Reflect::set(&obj, &"preimage".into(), &result.preimage.into())?;
-            js_sys::Reflect::set(&obj, &"paymentHash".into(), &result.payment_hash.into())?;
-            js_sys::Reflect::set(
-                &obj,
-                &"amountSats".into(),
-                &JsValue::from_f64(result.amount_sats as f64),
-            )?;
-            js_sys::Reflect::set(
-                &obj,
-                &"feeSats".into(),
-                &JsValue::from_f64(result.fee_sats as f64),
-            )?;
-            Ok(obj.into())
+            Ok(JsValue::from(WasmPaymentResult {
+                preimage: result.preimage,
+                payment_hash: result.payment_hash,
+                amount_sats: result.amount_sats,
+                fee_sats: result.fee_sats,
+            }))
         })
     }
 
     /// Get the current spendable balance in satoshis.
+    ///
+    /// Returns a `Promise<number>`.
     #[wasm_bindgen(js_name = "getBalance")]
     pub fn get_balance(&self) -> js_sys::Promise {
         let inner = self.inner.clone();
@@ -116,7 +153,7 @@ impl WasmLndRestBackend {
 
     /// Get information about the connected Lightning node.
     ///
-    /// Returns `{ pubkey, alias, numActiveChannels }`.
+    /// Returns a `Promise<WasmNodeInfo>`.
     #[wasm_bindgen(js_name = "getInfo")]
     pub fn get_info(&self) -> js_sys::Promise {
         let inner = self.inner.clone();
@@ -127,15 +164,11 @@ impl WasmLndRestBackend {
                 .await
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
 
-            let obj = js_sys::Object::new();
-            js_sys::Reflect::set(&obj, &"pubkey".into(), &info.pubkey.into())?;
-            js_sys::Reflect::set(&obj, &"alias".into(), &info.alias.into())?;
-            js_sys::Reflect::set(
-                &obj,
-                &"numActiveChannels".into(),
-                &JsValue::from_f64(f64::from(info.num_active_channels)),
-            )?;
-            Ok(obj.into())
+            Ok(JsValue::from(WasmNodeInfo {
+                pubkey: info.pubkey,
+                alias: info.alias,
+                num_active_channels: info.num_active_channels,
+            }))
         })
     }
 }
@@ -190,20 +223,12 @@ impl WasmSwissKnifeBackend {
                 .await
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
 
-            let obj = js_sys::Object::new();
-            js_sys::Reflect::set(&obj, &"preimage".into(), &result.preimage.into())?;
-            js_sys::Reflect::set(&obj, &"paymentHash".into(), &result.payment_hash.into())?;
-            js_sys::Reflect::set(
-                &obj,
-                &"amountSats".into(),
-                &JsValue::from_f64(result.amount_sats as f64),
-            )?;
-            js_sys::Reflect::set(
-                &obj,
-                &"feeSats".into(),
-                &JsValue::from_f64(result.fee_sats as f64),
-            )?;
-            Ok(obj.into())
+            Ok(JsValue::from(WasmPaymentResult {
+                preimage: result.preimage,
+                payment_hash: result.payment_hash,
+                amount_sats: result.amount_sats,
+                fee_sats: result.fee_sats,
+            }))
         })
     }
 
@@ -232,15 +257,11 @@ impl WasmSwissKnifeBackend {
                 .await
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
 
-            let obj = js_sys::Object::new();
-            js_sys::Reflect::set(&obj, &"pubkey".into(), &info.pubkey.into())?;
-            js_sys::Reflect::set(&obj, &"alias".into(), &info.alias.into())?;
-            js_sys::Reflect::set(
-                &obj,
-                &"numActiveChannels".into(),
-                &JsValue::from_f64(f64::from(info.num_active_channels)),
-            )?;
-            Ok(obj.into())
+            Ok(JsValue::from(WasmNodeInfo {
+                pubkey: info.pubkey,
+                alias: info.alias,
+                num_active_channels: info.num_active_channels,
+            }))
         })
     }
 }
