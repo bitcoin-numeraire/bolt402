@@ -109,7 +109,8 @@ export async function POST(req: NextRequest) {
       latencyMs,
     });
   } catch (error) {
-    let message = error instanceof Error ? error.message : 'Unknown error';
+    // WASM errors may be strings or JsValues, not Error instances
+    let message = error instanceof Error ? error.message : String(error);
     const cause = error instanceof Error ? (error.cause as Error)?.message ?? '' : '';
 
     // Improve common error messages

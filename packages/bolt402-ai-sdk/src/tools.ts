@@ -74,26 +74,36 @@ export function createBolt402Tools(config: Bolt402ToolsConfig) {
           .describe('Request body (for POST requests). Should be JSON-encoded.'),
       }),
       execute: async ({ url, method, body }) => {
-        const response =
-          method === 'POST'
-            ? await client.post(url, body ?? undefined)
-            : await client.get(url);
+        try {
+          const response =
+            method === 'POST'
+              ? await client.post(url, body ?? undefined)
+              : await client.get(url);
 
-        const receipt = response.receipt;
+          const receipt = response.receipt;
 
-        return {
-          status: response.status,
-          body: response.body,
-          paid: response.paid,
-          receipt: receipt
-            ? {
-                amountSats: receipt.amountSats,
-                feeSats: receipt.feeSats,
-                totalCostSats: receipt.totalCostSats(),
-                paymentHash: receipt.paymentHash,
-              }
-            : null,
-        };
+          return {
+            status: response.status,
+            body: response.body,
+            paid: response.paid,
+            receipt: receipt
+              ? {
+                  amountSats: receipt.amountSats,
+                  feeSats: receipt.feeSats,
+                  totalCostSats: receipt.totalCostSats(),
+                  paymentHash: receipt.paymentHash,
+                }
+              : null,
+          };
+        } catch (e) {
+          return {
+            status: 0,
+            body: '',
+            paid: false,
+            receipt: null,
+            error: e instanceof Error ? e.message : String(e),
+          };
+        }
       },
     }),
 
@@ -103,23 +113,32 @@ export function createBolt402Tools(config: Bolt402ToolsConfig) {
         'Useful for tracking costs, auditing payments, and reporting spend to the user.',
       inputSchema: z.object({}),
       execute: async () => {
-        const totalSpent = await client.totalSpent;
-        const receipts = await client.receipts();
+        try {
+          const totalSpent = await client.totalSpent;
+          const receipts = await client.receipts();
 
-        return {
-          totalSpentSats: totalSpent,
-          paymentCount: Array.isArray(receipts) ? receipts.length : 0,
-          receipts: Array.isArray(receipts)
-            ? receipts.map((r: any) => ({
-                endpoint: r.endpoint,
-                amountSats: r.amountSats,
-                feeSats: r.feeSats,
-                totalCostSats: r.totalCostSats(),
-                responseStatus: r.responseStatus,
-                timestamp: r.timestamp,
-              }))
-            : [],
-        };
+          return {
+            totalSpentSats: totalSpent,
+            paymentCount: Array.isArray(receipts) ? receipts.length : 0,
+            receipts: Array.isArray(receipts)
+              ? receipts.map((r: any) => ({
+                  endpoint: r.endpoint,
+                  amountSats: r.amountSats,
+                  feeSats: r.feeSats,
+                  totalCostSats: r.totalCostSats(),
+                  responseStatus: r.responseStatus,
+                  timestamp: r.timestamp,
+                }))
+              : [],
+          };
+        } catch (e) {
+          return {
+            totalSpentSats: 0,
+            paymentCount: 0,
+            receipts: [],
+            error: e instanceof Error ? e.message : String(e),
+          };
+        }
       },
     }),
   };

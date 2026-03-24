@@ -326,7 +326,10 @@ impl L402Client {
             });
         }
 
-        self.receipts.write().expect("RwLock poisoned").push(receipt.clone());
+        self.receipts
+            .write()
+            .expect("RwLock poisoned")
+            .push(receipt.clone());
 
         Ok(L402Response {
             inner: retry_response,

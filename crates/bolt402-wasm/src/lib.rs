@@ -54,6 +54,15 @@ pub mod backends;
 /// L402 client wrapper (full protocol engine from bolt402-core).
 pub mod client;
 
+/// Install a panic hook that logs the panic message to `console.error`.
+///
+/// Call this once before using any other WASM functions to get human-readable
+/// Rust panic messages instead of opaque `RuntimeError: unreachable`.
+#[wasm_bindgen(js_name = "setPanicHook")]
+pub fn set_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 
