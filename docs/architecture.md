@@ -38,7 +38,7 @@ bolt402-lnd  bolt402-  │  bolt402-  bolt402-    bolt402-wasm
 | `bolt402-mock` | A mock L402 server and mock Lightning backend for testing. No real Lightning infrastructure needed. |
 | `bolt402-wasm` | WebAssembly bindings via `wasm-bindgen`. Wraps `bolt402-lnd` (REST) and `bolt402-swissknife` as `WasmLndRestBackend` and `WasmSwissKnifeBackend`. Also provides an in-process mock L402 client for demos/testing. Depends on `bolt402-proto` + backend crates directly (not `bolt402-core`). |
 | `bolt402-sqlite` | Persistent `TokenStore` implementation using SQLite. |
-| `bolt402-ai-sdk` | TypeScript package providing Vercel AI SDK tools. Consumes `bolt402-wasm` for Rust-powered L402 protocol logic in the browser. |
+| `bolt402-ai-sdk` | TypeScript package providing Vercel AI SDK tools. Thin wrapper around `WasmL402Client` from `bolt402-wasm` — all L402 logic in Rust/WASM. |
 
 ## Ports and Adapters
 
@@ -93,21 +93,23 @@ You can implement your own adapters for LDK or any other Lightning implementatio
 
 ## WASM Architecture
 
-The WASM path intentionally bypasses `bolt402-core` to avoid pulling in tokio:
+`bolt402-core` has no async runtime dependency (no tokio). It uses `std::sync::RwLock` for internal state and `web_time::Instant` for timing (transparent shim: re-exports `std::time` on native, uses `performance.now()` on WASM). This means the full L402 engine compiles to WASM.
 
 ```
 bolt402-wasm
+  ├── bolt402-core           (L402Client engine — no async runtime)
   ├── bolt402-proto          (types, ports, errors — no async runtime)
   ├── bolt402-lnd[rest]      (reqwest → browser fetch on WASM)
   └── bolt402-swissknife     (reqwest → browser fetch on WASM)
 ```
 
 `bolt402-wasm` exposes:
-- **`WasmLndRestBackend`** / **`WasmSwissKnifeBackend`**: Thin wasm-bindgen wrappers around the real Rust backends. These make actual HTTP calls via `reqwest` (which compiles to browser `fetch` on `wasm32-unknown-unknown`).
+- **`WasmL402Client`**: Wraps the real `bolt402-core::L402Client` via `Rc<L402Client>` (same pattern as bdk-wasm's `Wallet`). Factory methods `withLndRest()` and `withSwissKnife()` construct the full client with Rust backends, budget tracker, and in-memory token cache. All L402 protocol logic runs in Rust.
+- **`WasmLndRestBackend`** / **`WasmSwissKnifeBackend`**: Direct wasm-bindgen wrappers around the Rust backends for standalone use.
 - **`WasmMockServer`** / **`WasmMockClient`**: In-process mock L402 environment for testing and demos. No HTTP server needed.
 - **Utility functions**: `parseL402Challenge()`, `buildL402Header()`, `version()`.
 
-The TypeScript `bolt402-ai-sdk` package consumes the WASM package and wraps the backends into Vercel AI SDK tools.
+The TypeScript `bolt402-ai-sdk` package is a thin wrapper: it creates Vercel AI SDK tool definitions that delegate to `WasmL402Client`. No L402 protocol logic in TypeScript.
 
 ## The L402 Protocol Flow
 
@@ -157,9 +159,9 @@ Budget checks happen before payment. If a limit would be exceeded, `ClientError:
 
 ## Design Principles
 
-1. **WASM-safe foundation.** `bolt402-proto` owns all port traits and has zero async runtime dependency. Backend crates that need to compile to WASM depend only on `bolt402-proto`, not `bolt402-core`.
+1. **WASM-safe foundation.** Both `bolt402-proto` and `bolt402-core` have zero async runtime dependency. The full L402 engine compiles to WASM. Backend crates that use reqwest get browser `fetch` for free on WASM targets.
 
-2. **Zero-dependency core.** `bolt402-core` depends only on `bolt402-proto`, reqwest, and tokio (for `RwLock`). No Lightning-specific dependencies leak into the core.
+2. **Zero-dependency core.** `bolt402-core` depends only on `bolt402-proto`, reqwest, and `web-time`. No async runtime, no Lightning-specific dependencies leak into the core. Compiles to WASM.
 
 3. **Swap anything.** Need a different Lightning backend? Implement `LnBackend`. Need persistent token storage? Implement `TokenStore`. The core doesn't care.
 

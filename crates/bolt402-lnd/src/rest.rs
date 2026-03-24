@@ -104,7 +104,7 @@ impl LndRestBackend {
     /// Reads from:
     /// - `LND_REST_URL` (default: `https://localhost:8080`)
     /// - `LND_MACAROON_HEX` - hex-encoded macaroon string (preferred)
-    /// - `LND_MACAROON_PATH` - path to binary macaroon file (fallback, requires tokio)
+    /// - `LND_MACAROON_PATH` - path to binary macaroon file (fallback, uses sync I/O)
     ///
     /// If both `LND_MACAROON_HEX` and `LND_MACAROON_PATH` are set,
     /// `LND_MACAROON_HEX` takes precedence.
