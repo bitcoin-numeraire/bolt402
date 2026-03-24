@@ -7,8 +7,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use rusqlite::Connection;
 
-use bolt402_proto::port::TokenStore;
 use bolt402_proto::ClientError;
+use bolt402_proto::port::TokenStore;
 
 use crate::SqliteStoreError;
 use crate::migration;
