@@ -52,8 +52,7 @@
 pub mod backends;
 
 pub use backends::{
-    WasmClnRestBackend, WasmLndRestBackend, WasmNodeInfo, WasmPaymentResult,
-    WasmSwissKnifeBackend,
+    WasmClnRestBackend, WasmLndRestBackend, WasmNodeInfo, WasmPaymentResult, WasmSwissKnifeBackend,
 };
 
 /// L402 client wrapper (full protocol engine from bolt402-core).

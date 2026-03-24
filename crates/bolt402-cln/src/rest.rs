@@ -181,10 +181,7 @@ impl ClnRestBackend {
     }
 
     /// Attach authentication headers to a request builder.
-    fn authenticate(
-        &self,
-        builder: reqwest::RequestBuilder,
-    ) -> reqwest::RequestBuilder {
+    fn authenticate(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         match &self.auth {
             AuthMethod::Macaroon(mac) => builder.header("macaroon", mac),
             AuthMethod::Rune(rune) => builder.header("Rune", rune),
@@ -265,9 +262,10 @@ impl LnBackend for ClnRestBackend {
             return Err(ClnError::Api { status, body }.into());
         }
 
-        let data: PayResponse = response.json().await.map_err(|e| {
-            ClnError::Deserialize(format!("failed to parse payment response: {e}"))
-        })?;
+        let data: PayResponse = response
+            .json()
+            .await
+            .map_err(|e| ClnError::Deserialize(format!("failed to parse payment response: {e}")))?;
 
         let status = data.status.as_deref().unwrap_or("unknown");
         if status != "complete" {
@@ -306,9 +304,10 @@ impl LnBackend for ClnRestBackend {
             return Err(ClnError::Api { status, body }.into());
         }
 
-        let data: ChannelBalanceResponse = response.json().await.map_err(|e| {
-            ClnError::Deserialize(format!("failed to parse balance response: {e}"))
-        })?;
+        let data: ChannelBalanceResponse = response
+            .json()
+            .await
+            .map_err(|e| ClnError::Deserialize(format!("failed to parse balance response: {e}")))?;
 
         // c-lightning-REST returns balances in millisatoshis.
         let balance_msat = data.local_balance.unwrap_or(0);
@@ -328,9 +327,10 @@ impl LnBackend for ClnRestBackend {
             return Err(ClnError::Api { status, body }.into());
         }
 
-        let data: GetInfoResponse = response.json().await.map_err(|e| {
-            ClnError::Deserialize(format!("failed to parse getinfo response: {e}"))
-        })?;
+        let data: GetInfoResponse = response
+            .json()
+            .await
+            .map_err(|e| ClnError::Deserialize(format!("failed to parse getinfo response: {e}")))?;
 
         Ok(NodeInfo {
             pubkey: data.id.unwrap_or_default(),
