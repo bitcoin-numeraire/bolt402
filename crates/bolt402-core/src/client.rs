@@ -8,8 +8,8 @@
 //!
 //! The client is composed from ports (traits) and adapters:
 //!
-//! - **[`LnBackend`]**: Pays Lightning invoices (e.g., LND, CLN)
-//! - **[`crate::port::TokenStore`]**: Caches L402 tokens to avoid re-paying
+//! - **[`bolt402_proto::port::LnBackend`]**: Pays Lightning invoices (e.g., LND, CLN)
+//! - **[`bolt402_proto::port::TokenStore`]**: Caches L402 tokens to avoid re-paying
 //! - **[`crate::budget::BudgetTracker`]**: Enforces spending limits
 //!
 //! # Example
