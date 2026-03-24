@@ -1,5 +1,5 @@
 use base64::Engine;
-use base64::engine::general_purpose::{self, GeneralPurpose, GeneralPurposeConfig};
+use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
 
 /// Base64 decoder that accepts both padded and unpadded input.
 ///
