@@ -48,8 +48,13 @@
 //! console.log(response.receipt);   // { amountSats: 10, ... }
 //! ```
 
-/// Real Lightning backend wrappers (LND REST, SwissKnife).
+/// Real Lightning backend wrappers (LND REST, CLN REST, SwissKnife).
 pub mod backends;
+
+pub use backends::{
+    WasmClnRestBackend, WasmLndRestBackend, WasmNodeInfo, WasmPaymentResult,
+    WasmSwissKnifeBackend,
+};
 
 /// L402 client wrapper (full protocol engine from bolt402-core).
 pub mod client;

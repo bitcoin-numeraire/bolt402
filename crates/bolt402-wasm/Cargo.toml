@@ -17,6 +17,7 @@ crate-type = ["cdylib", "rlib"]
 bolt402-proto = { workspace = true }
 bolt402-core = { workspace = true }
 bolt402-lnd = { workspace = true, default-features = false, features = ["rest"] }
+bolt402-cln = { workspace = true, default-features = false, features = ["rest"] }
 bolt402-swissknife = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -6,6 +6,7 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
+use bolt402_cln::ClnRestBackend;
 use bolt402_lnd::LndRestBackend;
 use bolt402_proto::LnBackend;
 use bolt402_swissknife::SwissKnifeBackend as RustSwissKnifeBackend;
@@ -112,6 +113,120 @@ impl WasmLndRestBackend {
     pub fn new(url: &str, macaroon: &str) -> Result<WasmLndRestBackend, JsError> {
         let inner = LndRestBackend::new(url, macaroon)
             .map_err(|e| JsError::new(&format!("failed to create LND backend: {e}")))?;
+        Ok(Self { inner })
+    }
+
+    /// Pay a BOLT11 Lightning invoice.
+    ///
+    /// Returns a `Promise<WasmPaymentResult>`.
+    #[wasm_bindgen(js_name = "payInvoice")]
+    pub fn pay_invoice(&self, bolt11: &str, max_fee_sats: u64) -> js_sys::Promise {
+        let bolt11 = bolt11.to_string();
+        let inner = self.inner.clone();
+
+        future_to_promise(async move {
+            let result = inner
+                .pay_invoice(&bolt11, max_fee_sats)
+                .await
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+
+            Ok(JsValue::from(WasmPaymentResult {
+                preimage: result.preimage,
+                payment_hash: result.payment_hash,
+                amount_sats: result.amount_sats,
+                fee_sats: result.fee_sats,
+            }))
+        })
+    }
+
+    /// Get the current spendable balance in satoshis.
+    ///
+    /// Returns a `Promise<number>`.
+    #[wasm_bindgen(js_name = "getBalance")]
+    pub fn get_balance(&self) -> js_sys::Promise {
+        let inner = self.inner.clone();
+
+        future_to_promise(async move {
+            let balance = inner
+                .get_balance()
+                .await
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            Ok(JsValue::from_f64(balance as f64))
+        })
+    }
+
+    /// Get information about the connected Lightning node.
+    ///
+    /// Returns a `Promise<WasmNodeInfo>`.
+    #[wasm_bindgen(js_name = "getInfo")]
+    pub fn get_info(&self) -> js_sys::Promise {
+        let inner = self.inner.clone();
+
+        future_to_promise(async move {
+            let info = inner
+                .get_info()
+                .await
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+
+            Ok(JsValue::from(WasmNodeInfo {
+                pubkey: info.pubkey,
+                alias: info.alias,
+                num_active_channels: info.num_active_channels,
+            }))
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WasmClnRestBackend
+// ---------------------------------------------------------------------------
+
+/// CLN REST backend for use in JavaScript/TypeScript.
+///
+/// Wraps the Rust `ClnRestBackend` which uses `reqwest` (compiled to
+/// browser `fetch` on WASM). Supports both macaroon and rune authentication.
+///
+/// # Example
+///
+/// ```javascript
+/// import init, { WasmClnRestBackend } from 'bolt402-wasm';
+///
+/// await init();
+///
+/// const cln = new WasmClnRestBackend("https://localhost:3001", "deadbeef...");
+/// const info = await cln.getInfo();
+/// console.log(info.alias);
+/// ```
+#[wasm_bindgen]
+pub struct WasmClnRestBackend {
+    inner: ClnRestBackend,
+}
+
+#[wasm_bindgen]
+impl WasmClnRestBackend {
+    /// Create a new CLN REST backend using macaroon authentication.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - CLN REST API URL (e.g. `https://localhost:3001`)
+    /// * `macaroon` - Hex-encoded access macaroon
+    #[wasm_bindgen(constructor)]
+    pub fn new(url: &str, macaroon: &str) -> Result<WasmClnRestBackend, JsError> {
+        let inner = ClnRestBackend::new(url, macaroon)
+            .map_err(|e| JsError::new(&format!("failed to create CLN backend: {e}")))?;
+        Ok(Self { inner })
+    }
+
+    /// Create a new CLN REST backend using rune authentication.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - CLN REST API URL (e.g. `https://localhost:3001`)
+    /// * `rune` - Rune token string
+    #[wasm_bindgen(js_name = "withRune")]
+    pub fn with_rune(url: &str, rune: &str) -> Result<WasmClnRestBackend, JsError> {
+        let inner = ClnRestBackend::with_rune(url, rune)
+            .map_err(|e| JsError::new(&format!("failed to create CLN backend: {e}")))?;
         Ok(Self { inner })
     }
 
