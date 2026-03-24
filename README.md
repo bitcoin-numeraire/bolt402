@@ -43,19 +43,19 @@ See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
 
 | Package | Description | Status |
 |---------|-------------|--------|
-| [`bolt402-proto`](crates/bolt402-proto) | L402 protocol types, challenge parsing, token construction | ✅ Complete |
-| [`bolt402-core`](crates/bolt402-core) | Client engine, ports, budget tracker, token cache, receipts | ✅ Complete |
-| [`bolt402-lnd`](crates/bolt402-lnd) | LND gRPC backend adapter | ✅ Complete |
+| [`bolt402-proto`](crates/bolt402-proto) | L402 protocol types, port traits (`LnBackend`, `TokenStore`), `ClientError`. WASM-safe, no async runtime dependency. | ✅ Complete |
+| [`bolt402-core`](crates/bolt402-core) | L402 client engine (`L402Client`), budget tracker, in-memory token cache, receipts | ✅ Complete |
+| [`bolt402-lnd`](crates/bolt402-lnd) | LND backend: gRPC (feature `grpc`) + REST (feature `rest`, WASM-compatible) | ✅ Complete |
 | [`bolt402-cln`](crates/bolt402-cln) | Core Lightning (CLN) gRPC backend adapter | ✅ Complete |
 | [`bolt402-nwc`](crates/bolt402-nwc) | Nostr Wallet Connect (NIP-47) backend adapter | ✅ Complete |
-| [`bolt402-swissknife`](crates/bolt402-swissknife) | SwissKnife REST backend adapter | ✅ Complete |
+| [`bolt402-swissknife`](crates/bolt402-swissknife) | SwissKnife REST backend adapter (WASM-compatible) | ✅ Complete |
 | [`bolt402-mock`](crates/bolt402-mock) | Mock L402 server for testing (no real Lightning needed) | ✅ Complete |
 | [`bolt402-sqlite`](crates/bolt402-sqlite) | SQLite persistent token store (survives restarts) | ✅ Complete |
-| [`bolt402-ai-sdk`](packages/bolt402-ai-sdk) | Vercel AI SDK tools (TypeScript) | ✅ Complete |
+| [`bolt402-wasm`](crates/bolt402-wasm) | WebAssembly bindings: wraps LND REST + SwissKnife backends, plus in-process mock | ✅ Complete |
+| [`bolt402-ai-sdk`](packages/bolt402-ai-sdk) | Vercel AI SDK tools (TypeScript), consumes bolt402-wasm | ✅ Complete |
 | [`bolt402-ffi`](crates/bolt402-ffi) | C-compatible FFI layer for Go/Swift/Kotlin bindings | ✅ Complete |
 | [`bolt402-python`](crates/bolt402-python) | Python bindings via PyO3 | ✅ Complete |
 | [`bolt402-go`](bindings/bolt402-go) | Go bindings via CGo | ✅ Complete |
-| [`bolt402-wasm`](crates/bolt402-wasm) | WebAssembly bindings via wasm-pack | ✅ Complete |
 | [`bolt402-langchain`](packages/bolt402-langchain) | LangChain Python tools (L402FetchTool, BudgetTool, callbacks) | ✅ Complete |
 
 ## Quick Start (Rust)
@@ -203,7 +203,6 @@ cargo doc --no-deps  # Build docs
 ### Upcoming
 
 - [ ] CLN REST backend adapter
-- [ ] LND REST backend adapter
 - [ ] LlamaIndex Python integration
 - [ ] CrewAI agent toolkit integration
 - [ ] TypeScript bindings via napi-rs (native Node.js addon)

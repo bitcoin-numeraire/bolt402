@@ -20,8 +20,10 @@ use bolt402_swissknife::SwissKnifeBackend as RustSwissKnifeBackend;
 pub struct WasmPaymentResult {
     preimage: String,
     payment_hash: String,
+    /// Amount paid in satoshis (excluding routing fees).
     #[wasm_bindgen(readonly, js_name = "amountSats")]
     pub amount_sats: u64,
+    /// Routing fee paid in satoshis.
     #[wasm_bindgen(readonly, js_name = "feeSats")]
     pub fee_sats: u64,
 }
@@ -53,6 +55,7 @@ impl WasmPaymentResult {
 pub struct WasmNodeInfo {
     pubkey: String,
     alias: String,
+    /// Number of active channels.
     #[wasm_bindgen(readonly, js_name = "numActiveChannels")]
     pub num_active_channels: u32,
 }
