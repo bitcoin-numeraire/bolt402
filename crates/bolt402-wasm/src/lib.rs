@@ -6,17 +6,33 @@
 //!
 //! # Architecture
 //!
-//! The WASM module provides an in-process mock L402 environment that runs
-//! entirely within the browser or WASM runtime — no HTTP server required.
-//! This is ideal for testing, demos, and development.
+//! The WASM module wraps the Rust `L402Client` from `bolt402-core`, providing
+//! the full L402 protocol engine (challenge parsing, budget enforcement, token
+//! caching, receipt tracking) compiled to WebAssembly. All protocol logic runs
+//! in Rust — no TypeScript reimplementation needed.
 //!
-//! The mock flow simulates the full L402 protocol:
-//! 1. Client requests a protected resource
-//! 2. Mock server issues a 402 challenge (macaroon + invoice)
-//! 3. Mock backend "pays" the invoice (looks up preimage)
-//! 4. Client retries with the L402 authorization token
+//! Additionally, an in-process mock L402 environment is provided for testing,
+//! demos, and development without a real Lightning node.
 //!
-//! # Example (JavaScript)
+//! # Example — Real L402 Client (JavaScript)
+//!
+//! ```javascript
+//! import init, { WasmL402Client, WasmBudgetConfig } from 'bolt402-wasm';
+//!
+//! await init();
+//!
+//! const client = WasmL402Client.withLndRest(
+//!   "https://localhost:8080",
+//!   "deadbeef...",
+//!   WasmBudgetConfig.unlimited(),
+//!   100,
+//! );
+//!
+//! const response = await client.get("https://api.example.com/data");
+//! console.log(response.status, response.paid, response.body);
+//! ```
+//!
+//! # Example — Mock (JavaScript)
 //!
 //! ```javascript
 //! import init, { WasmMockServer, WasmMockClient } from 'bolt402-wasm';
@@ -34,6 +50,9 @@
 
 /// Real Lightning backend wrappers (LND REST, SwissKnife).
 pub mod backends;
+
+/// L402 client wrapper (full protocol engine from bolt402-core).
+pub mod client;
 
 use std::cell::RefCell;
 use std::collections::HashMap;

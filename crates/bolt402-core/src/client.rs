@@ -43,12 +43,11 @@
 //! # }
 //! ```
 
-use std::sync::Arc;
-use std::time::Instant;
+use std::sync::{Arc, RwLock};
 
 use reqwest::header::{AUTHORIZATION, HeaderValue, WWW_AUTHENTICATE};
 use reqwest::{Client as HttpClient, StatusCode};
-use tokio::sync::RwLock;
+use web_time::Instant;
 
 use bolt402_proto::{L402Challenge, L402Token, decode_bolt11_amount};
 
@@ -327,7 +326,7 @@ impl L402Client {
             });
         }
 
-        self.receipts.write().await.push(receipt.clone());
+        self.receipts.write().expect("RwLock poisoned").push(receipt.clone());
 
         Ok(L402Response {
             inner: retry_response,
@@ -397,7 +396,7 @@ impl L402Client {
 
     /// Get all recorded payment receipts.
     pub async fn receipts(&self) -> Vec<Receipt> {
-        self.receipts.read().await.clone()
+        self.receipts.read().expect("RwLock poisoned").clone()
     }
 
     /// Get the total amount spent (in satoshis) across all payments.

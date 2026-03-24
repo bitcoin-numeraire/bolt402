@@ -4,11 +4,10 @@
 //! per-request, hourly, daily, and total budget caps.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
 use bolt402_proto::ClientError;
 
@@ -107,7 +106,7 @@ impl BudgetTracker {
 
         effective_budget.check(amount)?;
 
-        let mut state = self.state.write().await;
+        let mut state = self.state.write().expect("RwLock poisoned");
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -168,7 +167,7 @@ impl BudgetTracker {
 
     /// Get the total amount spent so far.
     pub async fn total_spent(&self) -> u64 {
-        self.state.read().await.total
+        self.state.read().expect("RwLock poisoned").total
     }
 }
 
