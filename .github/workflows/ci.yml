@@ -159,6 +159,6 @@ jobs:
         with:
           node-version: '22'
       - run: corepack enable
-      - run: yarn install
+      - run: yarn install --no-immutable  # WASM pkg is rebuilt each CI run, hash always changes
       - run: yarn tsc --noEmit
       - run: yarn vitest run
