@@ -5,7 +5,7 @@ import { openai } from '@ai-sdk/openai';
 import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 import { xai } from '@ai-sdk/xai';
 import { createBolt402Tools } from 'bolt402-ai-sdk';
-import { getSharedL402Client, getSharedBackend } from '@/lib/l402-shared';
+import { getSharedL402Client } from '@/lib/l402-shared';
 
 // ---------------------------------------------------------------------------
 // 402index MCP client (singleton — reused across requests)
@@ -220,9 +220,9 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
 
     // Get bolt402 payment tools (shared client so receipts persist)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bolt402Tools = createBolt402Tools({
-      client: getSharedL402Client(),
-      backend: getSharedBackend(),
+      client: getSharedL402Client() as any,
     });
 
     // Get 402index MCP discovery tools (with fallback)
