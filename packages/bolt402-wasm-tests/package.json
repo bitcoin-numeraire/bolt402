@@ -1,0 +1,19 @@
+{
+  "name": "bolt402-wasm-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "packageManager": "yarn@4.13.0",
+  "dependencies": {
+    "@bolt402/bolt402-wasm": "file:../../crates/bolt402-wasm/pkg"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}
