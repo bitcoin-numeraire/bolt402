@@ -137,6 +137,31 @@ jobs:
         working-directory: crates/bolt402-python
         run: .venv/bin/pytest ../../packages/bolt402-langchain/tests/ -v
 
+  wasm-node-tests:
+    name: WASM Node.js Tests
+    needs: wasm
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/bolt402-wasm/tests/node
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build WASM package
+        run: wasm-pack build crates/bolt402-wasm --target web
+        working-directory: ${{ github.workspace }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - run: yarn install --no-immutable
+      - run: yarn vitest run
+
   typescript:
     name: TypeScript (bolt402-ai-sdk)
     needs: wasm

@@ -41,6 +41,8 @@ pub use backends::{
 /// L402 client wrapper (full protocol engine from bolt402-core).
 pub mod client;
 
+pub use client::{WasmBudgetConfig, WasmL402Client, WasmL402Response, WasmReceipt};
+
 /// Install a panic hook that logs the panic message to `console.error`.
 ///
 /// Call this once before using any other WASM functions to get human-readable
