@@ -1686,27 +1686,27 @@ __metadata:
 
 "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk::locator=l402-explorer%40workspace%3A.":
   version: 0.1.0
-  resolution: "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk#../../packages/bolt402-ai-sdk::hash=178b87&locator=l402-explorer%40workspace%3A."
+  resolution: "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk#../../packages/bolt402-ai-sdk::hash=2a4ab8&locator=l402-explorer%40workspace%3A."
   dependencies:
     bolt402-wasm: "file:../../crates/bolt402-wasm/pkg"
   peerDependencies:
     ai: ">=6.0.0"
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/a3f060475a6f3043d4e0bf4a60375ee69e7c0ca0db38edd6b661fb90bfd0f4c50ac8bc3082af82de389d2e92d437da01c5e88e5d96631df9cfc2f23b7b732ee8
+  checksum: 10c0/a430f6138ce1f89e3fe4d970a6d170fa4376bdfa187548961b102d94377133bd80005faa9028bc064475732b85ce6fda70a592ace4a7d12787a41b659d158b91
   languageName: node
   linkType: hard
 
-"bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D178b87%26locator%3Dl402-explorer%2540workspace%253A.":
+"bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D2a4ab8%26locator%3Dl402-explorer%2540workspace%253A.":
   version: 0.1.0
-  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=2590b1&locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D178b87%26locator%3Dl402-explorer%2540workspace%253A."
-  checksum: 10c0/7e64e7676ab16be1bd90e300c194e8218e79c47f0fe1137919390194fb426ddf7fba214bcb14fd166827d114dda19ad8c55e008fe6a1c99e70ae7e3fd4ad94ad
+  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=a0f65a&locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D2a4ab8%26locator%3Dl402-explorer%2540workspace%253A."
+  checksum: 10c0/1486ea70bdd9095359670efd592fa7086369f6aad043d254d4449506bc5ba36126998e6d2463218a16c387a7ec80de6ce79614b635988264c3955e3a94ebabb0
   languageName: node
   linkType: hard
 
 "bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=l402-explorer%40workspace%3A.":
   version: 0.1.0
-  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=2590b1&locator=l402-explorer%40workspace%3A."
-  checksum: 10c0/7e64e7676ab16be1bd90e300c194e8218e79c47f0fe1137919390194fb426ddf7fba214bcb14fd166827d114dda19ad8c55e008fe6a1c99e70ae7e3fd4ad94ad
+  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=a0f65a&locator=l402-explorer%40workspace%3A."
+  checksum: 10c0/1486ea70bdd9095359670efd592fa7086369f6aad043d254d4449506bc5ba36126998e6d2463218a16c387a7ec80de6ce79614b635988264c3955e3a94ebabb0
   languageName: node
   linkType: hard
 

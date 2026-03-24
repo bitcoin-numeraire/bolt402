@@ -25,7 +25,7 @@ async function getIndexMCPClient() {
       const client = await createMCPClient({
         transport: new Experimental_StdioMCPTransport({
           command: 'npx',
-          args: ['-y', '@402index/mcp-server'],
+          args: ['-y', '@402index/mcp-server@0.1.3'],
         }),
       });
       mcpClient = client;

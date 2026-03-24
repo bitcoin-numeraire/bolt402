@@ -51,13 +51,38 @@ export async function POST(req: NextRequest) {
         id: 'payment',
         label: 'Lightning Payment',
         status: 'complete',
-        detail: `Hash: ${response.receipt.paymentHash.substring(0, 20)}...`,
+        detail: `Hash: ${response.receipt.paymentHash.substring(0, 20)}... (${Number(response.receipt.latencyMs)}ms)`,
       });
       steps.push({
         id: 'retry',
         label: 'Retry with Token',
         status: 'complete',
         detail: 'Authorization: L402 <macaroon>:<preimage>',
+      });
+      steps.push({
+        id: 'response',
+        label: 'Response Data',
+        status: 'complete',
+        detail: `Status ${response.status} — ${body.length} bytes`,
+      });
+    } else if (response.cachedToken) {
+      steps.push({
+        id: 'challenge',
+        label: 'Cached L402 Token',
+        status: 'complete',
+        detail: 'Used previously paid token — no new payment needed',
+      });
+      steps.push({
+        id: 'payment',
+        label: 'Lightning Payment',
+        status: 'complete',
+        detail: 'Skipped — token still valid',
+      });
+      steps.push({
+        id: 'retry',
+        label: 'Authenticated Request',
+        status: 'complete',
+        detail: 'Authorization: L402 <macaroon>:<preimage> (cached)',
       });
       steps.push({
         id: 'response',
@@ -103,6 +128,7 @@ export async function POST(req: NextRequest) {
             feeSats: Number(response.receipt.feeSats),
             totalCostSats: Number(response.receipt.totalCostSats()),
             paymentHash: response.receipt.paymentHash,
+            latencyMs: Number(response.receipt.latencyMs),
           }
         : null,
       steps,

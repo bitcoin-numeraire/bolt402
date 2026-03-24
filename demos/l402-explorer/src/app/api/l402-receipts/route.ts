@@ -24,6 +24,7 @@ export async function GET() {
       totalCostSats: Number(r.totalCostSats()),
       paymentHash: r.paymentHash,
       httpStatus: r.responseStatus,
+      latencyMs: Number(r.latencyMs),
       timestamp: Number(r.timestamp),
     })),
   });

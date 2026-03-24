@@ -91,6 +91,9 @@ pub struct WasmL402Response {
     /// Whether a Lightning payment was made.
     #[wasm_bindgen(readonly)]
     pub paid: bool,
+    /// Whether a cached L402 token was used (no new payment needed).
+    #[wasm_bindgen(readonly, js_name = "cachedToken")]
+    pub cached_token: bool,
     body: String,
     receipt: Option<WasmReceipt>,
 }
@@ -271,6 +274,7 @@ impl WasmL402Client {
                     payment_hash: r.payment_hash.clone(),
                     preimage: r.preimage.clone(),
                     response_status: r.response_status,
+                    latency_ms: r.latency_ms,
                 }));
             }
             Ok(arr.into())
@@ -283,6 +287,7 @@ async fn to_wasm_response(
     response: bolt402_core::L402Response,
 ) -> Result<WasmL402Response, JsValue> {
     let paid = response.paid();
+    let cached_token = response.cached_token();
     let receipt = response.receipt().map(|r| WasmReceipt {
         timestamp: r.timestamp,
         endpoint: r.endpoint.clone(),
@@ -291,6 +296,7 @@ async fn to_wasm_response(
         payment_hash: r.payment_hash.clone(),
         preimage: r.preimage.clone(),
         response_status: r.response_status,
+        latency_ms: r.latency_ms,
     });
     let status = response.status().as_u16();
     let body = response
@@ -301,6 +307,7 @@ async fn to_wasm_response(
     Ok(WasmL402Response {
         status,
         paid,
+        cached_token,
         body,
         receipt,
     })

@@ -88,9 +88,9 @@ export function createBolt402Tools(config: Bolt402ToolsConfig) {
             paid: response.paid,
             receipt: receipt
               ? {
-                  amountSats: receipt.amountSats,
-                  feeSats: receipt.feeSats,
-                  totalCostSats: receipt.totalCostSats(),
+                  amountSats: Number(receipt.amountSats),
+                  feeSats: Number(receipt.feeSats),
+                  totalCostSats: Number(receipt.totalCostSats()),
                   paymentHash: receipt.paymentHash,
                 }
               : null,
@@ -118,16 +118,16 @@ export function createBolt402Tools(config: Bolt402ToolsConfig) {
           const receipts = await client.receipts();
 
           return {
-            totalSpentSats: totalSpent,
+            totalSpentSats: Number(totalSpent),
             paymentCount: Array.isArray(receipts) ? receipts.length : 0,
             receipts: Array.isArray(receipts)
               ? receipts.map((r: any) => ({
                   endpoint: r.endpoint,
-                  amountSats: r.amountSats,
-                  feeSats: r.feeSats,
-                  totalCostSats: r.totalCostSats(),
+                  amountSats: Number(r.amountSats),
+                  feeSats: Number(r.feeSats),
+                  totalCostSats: Number(r.totalCostSats()),
                   responseStatus: r.responseStatus,
-                  timestamp: r.timestamp,
+                  timestamp: Number(r.timestamp),
                 }))
               : [],
           };

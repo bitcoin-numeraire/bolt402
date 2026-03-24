@@ -9,7 +9,7 @@ export async function fetchServices(
 ): Promise<L402Service[]> {
   const params = new URLSearchParams();
   params.set('protocol', 'l402');
-  params.set('limit', '100');
+  params.set('limit', '1000');
   if (category && category !== 'all') params.set('category', category);
   if (query) params.set('q', query);
 

@@ -638,8 +638,8 @@ __metadata:
 
 "bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=bolt402-ai-sdk%40workspace%3A.":
   version: 0.1.0
-  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=9a094c&locator=bolt402-ai-sdk%40workspace%3A."
-  checksum: 10c0/140e43edd18d775e9154be633ab91441fe827ed769766ab2bb560b69e2ac386ad7831036972ff3881aa1fa0a7e8e690a6b0c0aedc8907fe904fc8db089bae1de
+  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=a0f65a&locator=bolt402-ai-sdk%40workspace%3A."
+  checksum: 10c0/1486ea70bdd9095359670efd592fa7086369f6aad043d254d4449506bc5ba36126998e6d2463218a16c387a7ec80de6ce79614b635988264c3955e3a94ebabb0
   languageName: node
   linkType: hard
 

@@ -247,6 +247,7 @@ impl L402Client {
                 return Ok(L402Response {
                     inner: response,
                     paid: false,
+                    cached_token: true,
                     receipt: None,
                 });
             }
@@ -264,6 +265,7 @@ impl L402Client {
             return Ok(L402Response {
                 inner: response,
                 paid: false,
+                cached_token: false,
                 receipt: None,
             });
         }
@@ -334,6 +336,7 @@ impl L402Client {
         Ok(L402Response {
             inner: retry_response,
             paid: true,
+            cached_token: false,
             receipt: Some(receipt),
         })
     }
@@ -416,6 +419,7 @@ impl L402Client {
 pub struct L402Response {
     inner: reqwest::Response,
     paid: bool,
+    cached_token: bool,
     receipt: Option<Receipt>,
 }
 
@@ -428,6 +432,11 @@ impl L402Response {
     /// Whether a Lightning payment was made for this request.
     pub fn paid(&self) -> bool {
         self.paid
+    }
+
+    /// Whether a cached L402 token was used (no new payment needed).
+    pub fn cached_token(&self) -> bool {
+        self.cached_token
     }
 
     /// Get the payment receipt, if a payment was made.

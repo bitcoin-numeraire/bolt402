@@ -233,6 +233,10 @@ pub struct WasmReceipt {
     #[wasm_bindgen(readonly, js_name = "responseStatus")]
     pub response_status: u16,
 
+    /// Total latency from initial request to final response (milliseconds).
+    #[wasm_bindgen(readonly, js_name = "latencyMs")]
+    pub latency_ms: u64,
+
     /// Endpoint path that was accessed.
     endpoint: String,
 
@@ -784,6 +788,7 @@ impl WasmMockClient {
             payment_hash,
             preimage,
             response_status: retry_status,
+            latency_ms: 0, // mock has no real latency tracking
         };
 
         self.receipts.borrow_mut().push(receipt.clone());
