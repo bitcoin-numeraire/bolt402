@@ -18,8 +18,8 @@
 //! use bolt402_core::{L402Client, L402ClientConfig};
 //! use bolt402_core::budget::Budget;
 //! use bolt402_core::cache::InMemoryTokenStore;
-//! # use bolt402_core::port::{LnBackend, PaymentResult, NodeInfo};
-//! # use bolt402_core::ClientError;
+//! # use bolt402_proto::port::{LnBackend, PaymentResult, NodeInfo};
+//! # use bolt402_proto::ClientError;
 //! # use async_trait::async_trait;
 //!
 //! # struct MyBackend;
