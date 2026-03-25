@@ -102,7 +102,7 @@ describe("Regtest: LND REST backend via WASM", () => {
     expect(response.paid).toBe(true);
     expect(response.cachedToken).toBe(false);
 
-    const receipt = response.receipt();
+    const receipt = response.receipt;
     expect(receipt).toBeDefined();
     expect(receipt!.amountSats).toBe(BigInt(100));
     expect(receipt!.responseStatus).toBe(200);

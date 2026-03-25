@@ -1,46 +1,15 @@
-# SwissKnife regtest configuration for bolt402 integration tests.
-# Connects to lnd-bob as the Lightning provider via LND REST.
+# SwissKnife regtest overrides (merged with default config).
+# Connects to CLN as the Lightning provider via clnrest.
 
-invoice_expiry = "1h"
-domain = "localhost"
-host = "http://localhost:3000"
-fee_buffer = 0.02
-ln_provider = "lndrest"
+ln_provider = "clnrest"
 auth_provider = "jwt"
+host = "http://swissknife:3000"
 
-[web]
-addr = "0.0.0.0:3000"
-request_timeout = "60s"
-
-[lnd_rest_config]
-host = "lnd-bob:8080"
-macaroon_path = "/lnd/data/chain/bitcoin/regtest/admin.macaroon"
-ca_cert_path = "/lnd/tls.cert"
-connect_timeout = "10s"
-timeout = "90s"
-connection_verbose = true
+[cln_rest_config]
+endpoint = "https://cln:3010"
+rune = "CHANGE_ME"
 accept_invalid_certs = true
 accept_invalid_hostnames = true
-payment_timeout = "60s"
-fee_limit_msat = 25000
-ws_min_reconnect_delay = "1s"
-ws_max_reconnect_delay = "30s"
-reorg_buffer_blocks = 2
 
 [jwt]
-token_expiry = "24h"
 secret = "bolt402-regtest-jwt-secret-do-not-use-in-production"
-
-[database]
-url = "sqlite://storage/swissknife.db?mode=rwc"
-max_connections = 5
-min_connections = 0
-acquire_timeout = "5s"
-connect_timeout = "30s"
-sqlx_logging = false
-
-[logging]
-format = "json"
-ansi = false
-level = "info"
-filter = "warn,swissknife=info"

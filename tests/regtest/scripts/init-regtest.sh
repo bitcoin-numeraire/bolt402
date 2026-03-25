@@ -215,14 +215,15 @@ CLN_REST_RUNE=$(cln createrune 2>/dev/null | jq -r '.rune // empty')
 
 log "=== Step 6: Setting up SwissKnife ==="
 
+# Export CLN rune to .env so docker-compose can pass it to swissknife
+echo "CLN_RUNE=${CLN_REST_RUNE}" > "${PROJECT_DIR}/.env"
+
+# Restart swissknife now that the rune is available
+docker compose -f "$COMPOSE_FILE" up -d swissknife 2>/dev/null
+
 # Wait for SwissKnife to be ready
 SWISSKNIFE_READY=false
 for i in $(seq 1 30); do
-  if wget -q -O- http://localhost:3000/v1/health 2>/dev/null | grep -q "ok\|healthy\|running" 2>/dev/null; then
-    SWISSKNIFE_READY=true
-    break
-  fi
-  # Also try just a 200 status
   if wget -q -O /dev/null http://localhost:3000/v1/health 2>/dev/null; then
     SWISSKNIFE_READY=true
     break
@@ -236,39 +237,51 @@ SWISSKNIFE_API_KEY=""
 if [ "$SWISSKNIFE_READY" = true ]; then
   log "SwissKnife is ready."
 
-  # Generate a JWT token for the test user.
-  # SwissKnife JWT auth creates a wallet on first authenticated request.
-  # JWT secret must match the one in swissknife/regtest.toml.
-  JWT_SECRET="bolt402-regtest-jwt-secret-do-not-use-in-production"
+  # 1. Sign up to get a JWT token
+  SIGNUP_RESP=$(wget -q -O- --post-data='{"username":"bolt402test","password":"bolt402testpass"}' \
+    --header="Content-Type: application/json" \
+    "$SWISSKNIFE_API_URL/v1/auth/sign-up" 2>/dev/null || echo "")
 
-  # Create JWT using node (available from the backend container or host)
-  SWISSKNIFE_API_KEY=$(docker compose -f "$COMPOSE_FILE" exec -T backend node -e "
-    const header = Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
-    const now = Math.floor(Date.now()/1000);
-    const payload = Buffer.from(JSON.stringify({
-      sub: 'bolt402-test-user',
-      iat: now,
-      exp: now + 86400,
-      permissions: ['read:transaction','write:transaction','read:wallet','write:wallet']
-    })).toString('base64url');
-    const crypto = require('crypto');
-    const sig = crypto.createHmac('sha256','${JWT_SECRET}').update(header+'.'+payload).digest('base64url');
-    console.log(header+'.'+payload+'.'+sig);
-  " 2>/dev/null | tr -d '\r\n')
+  JWT_TOKEN=""
+  if [ -n "$SIGNUP_RESP" ]; then
+    JWT_TOKEN=$(echo "$SIGNUP_RESP" | jq -r '.token // .access_token // empty' 2>/dev/null)
+  fi
 
-  if [ -n "$SWISSKNIFE_API_KEY" ]; then
-    log "SwissKnife JWT token created."
+  # If sign-up fails (user exists), try sign-in
+  if [ -z "$JWT_TOKEN" ]; then
+    SIGNIN_RESP=$(wget -q -O- --post-data='{"username":"bolt402test","password":"bolt402testpass"}' \
+      --header="Content-Type: application/json" \
+      "$SWISSKNIFE_API_URL/v1/auth/sign-in" 2>/dev/null || echo "")
+    if [ -n "$SIGNIN_RESP" ]; then
+      JWT_TOKEN=$(echo "$SIGNIN_RESP" | jq -r '.token // .access_token // empty' 2>/dev/null)
+    fi
+  fi
 
-    # Trigger wallet creation by calling /v1/me (auto-creates on first auth)
-    WALLET_RESP=$(wget -q -O- --header="Authorization: Bearer $SWISSKNIFE_API_KEY" \
-      "$SWISSKNIFE_API_URL/v1/me" 2>/dev/null || echo "")
-    if [ -n "$WALLET_RESP" ]; then
-      log "SwissKnife wallet initialized."
+  if [ -n "$JWT_TOKEN" ]; then
+    log "SwissKnife JWT obtained."
+
+    # 2. Create an API key
+    APIKEY_RESP=$(wget -q -O- --post-data='{"name":"bolt402-regtest"}' \
+      --header="Content-Type: application/json" \
+      --header="Authorization: Bearer $JWT_TOKEN" \
+      "$SWISSKNIFE_API_URL/v1/me/api-keys" 2>/dev/null || echo "")
+
+    if [ -n "$APIKEY_RESP" ]; then
+      SWISSKNIFE_API_KEY=$(echo "$APIKEY_RESP" | jq -r '.key // .api_key // empty' 2>/dev/null)
+      if [ -n "$SWISSKNIFE_API_KEY" ]; then
+        log "SwissKnife API key created."
+      else
+        # Fallback: use JWT token directly
+        SWISSKNIFE_API_KEY="$JWT_TOKEN"
+        log "WARNING: Could not extract API key, using JWT token instead."
+      fi
     else
-      log "WARNING: Could not initialize SwissKnife wallet (may need manual setup)."
+      # Fallback: use JWT token directly
+      SWISSKNIFE_API_KEY="$JWT_TOKEN"
+      log "WARNING: Could not create API key, using JWT token instead."
     fi
   else
-    log "WARNING: Failed to generate SwissKnife JWT token."
+    log "WARNING: SwissKnife auth failed (skipping)."
   fi
 else
   log "WARNING: SwissKnife not available (skipping setup)."
