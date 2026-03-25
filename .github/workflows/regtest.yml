@@ -57,7 +57,7 @@ jobs:
         working-directory: tests/regtest
         run: |
           echo "Waiting for Aperture..."
-          timeout 60 bash -c 'until wget -q -O- http://localhost:8081/health 2>/dev/null; do sleep 3; done'
+          timeout 60 bash -c "until wget -S -O /dev/null http://localhost:8081/health 2>&1 | grep -q 'HTTP/'; do sleep 3; done"
           echo "Aperture ready."
 
       - name: Run regtest integration tests
