@@ -331,7 +331,9 @@ impl LnBackend for ClnRestBackend {
     async fn get_balance(&self) -> Result<u64, ClientError> {
         let url = format!("{}/v1/listfunds", self.url);
 
-        let request = self.authenticate(self.client.post(&url)).json(&serde_json::json!({}));
+        let request = self
+            .authenticate(self.client.post(&url))
+            .json(&serde_json::json!({}));
 
         let response = request.send().await.map_err(ClnError::from)?;
 
@@ -364,7 +366,9 @@ impl LnBackend for ClnRestBackend {
     async fn get_info(&self) -> Result<NodeInfo, ClientError> {
         let url = format!("{}/v1/getinfo", self.url);
 
-        let request = self.authenticate(self.client.post(&url)).json(&serde_json::json!({}));
+        let request = self
+            .authenticate(self.client.post(&url))
+            .json(&serde_json::json!({}));
 
         let response = request.send().await.map_err(ClnError::from)?;
 
@@ -406,11 +410,12 @@ mod tests {
         }"#;
         let resp: PayResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.status.as_deref(), Some("complete"));
-        assert_eq!(resp.amount_msat.as_ref().and_then(MsatValue::as_u64), Some(100_000));
         assert_eq!(
-            resp.amount_sent_msat
-                .as_ref()
-                .and_then(MsatValue::as_u64),
+            resp.amount_msat.as_ref().and_then(MsatValue::as_u64),
+            Some(100_000)
+        );
+        assert_eq!(
+            resp.amount_sent_msat.as_ref().and_then(MsatValue::as_u64),
             Some(100_500)
         );
         assert!(resp.payment_preimage.is_some());
@@ -461,11 +466,12 @@ mod tests {
             "status": "complete"
         }"#;
         let resp: PayResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.amount_msat.as_ref().and_then(MsatValue::as_u64), Some(500_000));
         assert_eq!(
-            resp.amount_sent_msat
-                .as_ref()
-                .and_then(MsatValue::as_u64),
+            resp.amount_msat.as_ref().and_then(MsatValue::as_u64),
+            Some(500_000)
+        );
+        assert_eq!(
+            resp.amount_sent_msat.as_ref().and_then(MsatValue::as_u64),
             Some(500_100)
         );
     }

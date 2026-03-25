@@ -6,9 +6,9 @@
 use std::path::PathBuf;
 use std::sync::Once;
 
+use bolt402_core::L402Client;
 use bolt402_core::budget::Budget;
 use bolt402_core::cache::InMemoryTokenStore;
-use bolt402_core::L402Client;
 use bolt402_lnd::LndGrpcBackend;
 use bolt402_lnd::LndRestBackend;
 use bolt402_proto::LnBackend;

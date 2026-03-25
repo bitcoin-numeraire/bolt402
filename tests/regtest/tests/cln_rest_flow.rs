@@ -14,7 +14,9 @@ macro_rules! skip_if_no_cln_rest {
         let $backend = match cln_rest_backend().await {
             Some(b) => b,
             None => {
-                eprintln!("SKIP: CLN REST backend not available (rune missing or connection failed)");
+                eprintln!(
+                    "SKIP: CLN REST backend not available (rune missing or connection failed)"
+                );
                 return;
             }
         };
