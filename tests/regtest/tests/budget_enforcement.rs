@@ -45,7 +45,7 @@ async fn per_request_budget_blocks_expensive() {
         "should reject payment exceeding per-request budget"
     );
 
-    let err = result.unwrap_err();
+    let err = result.err().expect("expected budget error");
     let err_str = format!("{err}");
     assert!(
         err_str.contains("budget") || err_str.contains("Budget"),

@@ -24,6 +24,10 @@ name = "cln_flow"
 path = "tests/cln_flow.rs"
 
 [[test]]
+name = "cln_rest_flow"
+path = "tests/cln_rest_flow.rs"
+
+[[test]]
 name = "budget_enforcement"
 path = "tests/budget_enforcement.rs"
 
@@ -39,7 +43,7 @@ path = "tests/sqlite_persistence.rs"
 bolt402-proto = { workspace = true }
 bolt402-core = { workspace = true }
 bolt402-lnd = { workspace = true, features = ["grpc", "rest"] }
-bolt402-cln = { workspace = true, features = ["grpc"] }
+bolt402-cln = { workspace = true, features = ["grpc", "rest"] }
 bolt402-sqlite = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 reqwest = { workspace = true }
@@ -51,3 +55,4 @@ dotenvy = "0.15"
 base64 = { version = "0.22" }
 hex = { version = "0.4" }
 sha2 = { version = "0.10" }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }

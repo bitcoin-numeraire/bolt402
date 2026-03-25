@@ -208,21 +208,52 @@ fn build_http_client() -> Result<HttpClient, ClnError> {
 struct PayResponse {
     payment_preimage: Option<String>,
     payment_hash: Option<String>,
-    msatoshi: Option<u64>,
-    msatoshi_sent: Option<u64>,
+    #[serde(alias = "msatoshi")]
+    amount_msat: Option<MsatValue>,
+    #[serde(alias = "msatoshi_sent")]
+    amount_sent_msat: Option<MsatValue>,
     status: Option<String>,
 }
 
-/// Response from `GET /v1/channel/localRemoteBal`.
+/// Millisatoshi values returned by CLN REST.
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ChannelBalanceResponse {
-    local_balance: Option<u64>,
-    #[allow(dead_code)]
-    remote_balance: Option<u64>,
+#[serde(untagged)]
+enum MsatValue {
+    /// Raw numeric millisatoshis.
+    Number(u64),
+    /// String values such as `"1000msat"`.
+    String(String),
+    /// Object values such as `{ "msat": 1000 }`.
+    Object {
+        /// Millisatoshis.
+        msat: u64,
+    },
 }
 
-/// Response from `GET /v1/getinfo`.
+impl MsatValue {
+    /// Convert the deserialized value into raw millisatoshis.
+    fn as_u64(&self) -> Option<u64> {
+        match self {
+            Self::Number(value) | Self::Object { msat: value } => Some(*value),
+            Self::String(value) => value.strip_suffix("msat").unwrap_or(value).parse().ok(),
+        }
+    }
+}
+
+/// Response from `POST /v1/listfunds`.
+#[derive(Debug, Deserialize)]
+struct ListFundsResponse {
+    #[serde(default)]
+    channels: Vec<ListFundsChannel>,
+}
+
+/// Channel balance entries returned by `listfunds`.
+#[derive(Debug, Deserialize)]
+struct ListFundsChannel {
+    our_amount_msat: Option<MsatValue>,
+}
+
+/// Response from `POST /v1/getinfo`.
 #[derive(Debug, Deserialize)]
 struct GetInfoResponse {
     id: Option<String>,
@@ -244,12 +275,10 @@ impl LnBackend for ClnRestBackend {
     ) -> Result<PaymentResult, ClientError> {
         let url = format!("{}/v1/pay", self.url);
 
-        // CLN REST expects maxfeepercent and exemptfee rather than absolute fee limits.
-        // We set a high maxfeepercent and use exemptfee as the absolute cap.
         let body = serde_json::json!({
-            "invoice": bolt11,
-            "maxfeepercent": 100,
-            "exemptfee": max_fee_sats * 1000,
+            "bolt11": bolt11,
+            "maxfee": format!("{}msat", max_fee_sats.saturating_mul(1000)),
+            "retry_for": 60,
         });
 
         let request = self.authenticate(self.client.post(&url)).json(&body);
@@ -279,8 +308,16 @@ impl LnBackend for ClnRestBackend {
             ClnError::Payment("payment complete but returned empty hash".to_string())
         })?;
 
-        let amount_msat = data.msatoshi.unwrap_or(0);
-        let sent_msat = data.msatoshi_sent.unwrap_or(0);
+        let amount_msat = data
+            .amount_msat
+            .as_ref()
+            .and_then(MsatValue::as_u64)
+            .unwrap_or(0);
+        let sent_msat = data
+            .amount_sent_msat
+            .as_ref()
+            .and_then(MsatValue::as_u64)
+            .unwrap_or(0);
         let fee_msat = sent_msat.saturating_sub(amount_msat);
 
         Ok(PaymentResult {
@@ -292,9 +329,9 @@ impl LnBackend for ClnRestBackend {
     }
 
     async fn get_balance(&self) -> Result<u64, ClientError> {
-        let url = format!("{}/v1/channel/localRemoteBal", self.url);
+        let url = format!("{}/v1/listfunds", self.url);
 
-        let request = self.authenticate(self.client.get(&url));
+        let request = self.authenticate(self.client.post(&url)).json(&serde_json::json!({}));
 
         let response = request.send().await.map_err(ClnError::from)?;
 
@@ -304,20 +341,30 @@ impl LnBackend for ClnRestBackend {
             return Err(ClnError::Api { status, body }.into());
         }
 
-        let data: ChannelBalanceResponse = response
+        let data: ListFundsResponse = response
             .json()
             .await
             .map_err(|e| ClnError::Deserialize(format!("failed to parse balance response: {e}")))?;
 
-        // c-lightning-REST returns balances in millisatoshis.
-        let balance_msat = data.local_balance.unwrap_or(0);
+        let balance_msat: u64 = data
+            .channels
+            .iter()
+            .map(|channel| {
+                channel
+                    .our_amount_msat
+                    .as_ref()
+                    .and_then(MsatValue::as_u64)
+                    .unwrap_or(0)
+            })
+            .sum();
+
         Ok(balance_msat / 1000)
     }
 
     async fn get_info(&self) -> Result<NodeInfo, ClientError> {
         let url = format!("{}/v1/getinfo", self.url);
 
-        let request = self.authenticate(self.client.get(&url));
+        let request = self.authenticate(self.client.post(&url)).json(&serde_json::json!({}));
 
         let response = request.send().await.map_err(ClnError::from)?;
 
@@ -353,14 +400,19 @@ mod tests {
         let json = r#"{
             "payment_preimage": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
             "payment_hash": "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
-            "msatoshi": 100000,
-            "msatoshi_sent": 100500,
+            "amount_msat": "100000msat",
+            "amount_sent_msat": "100500msat",
             "status": "complete"
         }"#;
         let resp: PayResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.status.as_deref(), Some("complete"));
-        assert_eq!(resp.msatoshi, Some(100_000));
-        assert_eq!(resp.msatoshi_sent, Some(100_500));
+        assert_eq!(resp.amount_msat.as_ref().and_then(MsatValue::as_u64), Some(100_000));
+        assert_eq!(
+            resp.amount_sent_msat
+                .as_ref()
+                .and_then(MsatValue::as_u64),
+            Some(100_500)
+        );
         assert!(resp.payment_preimage.is_some());
         assert!(resp.payment_hash.is_some());
     }
@@ -383,23 +435,74 @@ mod tests {
             "status": "complete"
         }"#;
         let resp: PayResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.msatoshi.unwrap_or(0), 0);
-        assert_eq!(resp.msatoshi_sent.unwrap_or(0), 0);
+        assert_eq!(
+            resp.amount_msat
+                .as_ref()
+                .and_then(MsatValue::as_u64)
+                .unwrap_or(0),
+            0
+        );
+        assert_eq!(
+            resp.amount_sent_msat
+                .as_ref()
+                .and_then(MsatValue::as_u64)
+                .unwrap_or(0),
+            0
+        );
     }
 
     #[test]
-    fn channel_balance_response() {
-        let json = r#"{"localBalance": 500000, "remoteBalance": 300000}"#;
-        let resp: ChannelBalanceResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.local_balance, Some(500_000));
-        assert_eq!(resp.remote_balance, Some(300_000));
+    fn pay_response_legacy_amount_fields() {
+        let json = r#"{
+            "payment_preimage": "abc123",
+            "payment_hash": "def456",
+            "msatoshi": 500000,
+            "msatoshi_sent": 500100,
+            "status": "complete"
+        }"#;
+        let resp: PayResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.amount_msat.as_ref().and_then(MsatValue::as_u64), Some(500_000));
+        assert_eq!(
+            resp.amount_sent_msat
+                .as_ref()
+                .and_then(MsatValue::as_u64),
+            Some(500_100)
+        );
     }
 
     #[test]
-    fn channel_balance_response_empty() {
-        let json = r#"{}"#;
-        let resp: ChannelBalanceResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.local_balance, None);
+    fn msat_value_parses_multiple_shapes() {
+        let number: MsatValue = serde_json::from_str("1000").unwrap();
+        let string: MsatValue = serde_json::from_str(r#""2500msat""#).unwrap();
+        let object: MsatValue = serde_json::from_str(r#"{"msat": 7500}"#).unwrap();
+
+        assert_eq!(number.as_u64(), Some(1000));
+        assert_eq!(string.as_u64(), Some(2500));
+        assert_eq!(object.as_u64(), Some(7500));
+    }
+
+    #[test]
+    fn list_funds_response_sums_channel_amounts() {
+        let json = r#"{
+            "channels": [
+                {"our_amount_msat": "4000000msat"},
+                {"our_amount_msat": {"msat": 1000000}},
+                {"our_amount_msat": 500000}
+            ]
+        }"#;
+        let resp: ListFundsResponse = serde_json::from_str(json).unwrap();
+        let total: u64 = resp
+            .channels
+            .iter()
+            .map(|channel| {
+                channel
+                    .our_amount_msat
+                    .as_ref()
+                    .and_then(MsatValue::as_u64)
+                    .unwrap_or(0)
+            })
+            .sum();
+        assert_eq!(total, 5_500_000);
     }
 
     #[test]

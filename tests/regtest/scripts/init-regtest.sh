@@ -24,11 +24,40 @@ ENV_FILE="${PROJECT_DIR}/.env.regtest"
 
 # Shorthand helpers
 btc()   { docker compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest -rpcuser=regtest -rpcpassword=regtest "$@"; }
-alice() { docker compose -f "$COMPOSE_FILE" exec -T lnd-alice lncli --network=regtest "$@"; }
-bob()   { docker compose -f "$COMPOSE_FILE" exec -T lnd-bob lncli --network=regtest "$@"; }
+alice() { docker compose -f "$COMPOSE_FILE" exec -T lnd-alice lncli --network=regtest --tlscertpath=/tls/alice-tls.cert "$@"; }
+bob()   { docker compose -f "$COMPOSE_FILE" exec -T lnd-bob lncli --network=regtest --tlscertpath=/tls/bob-tls.cert "$@"; }
 cln()   { docker compose -f "$COMPOSE_FILE" exec -T cln lightning-cli --network=regtest "$@"; }
 
 log() { echo "[init-regtest] $*"; }
+
+open_cln_channel() {
+  local peer_id="$1"
+  local amount="$2"
+  local push_msat="$3"
+  local max_wait="${4:-60}"
+  local elapsed=0
+
+  while [ "$elapsed" -lt "$max_wait" ]; do
+    local output
+    if output=$(cln fundchannel id="$peer_id" amount="$amount" push_msat="$push_msat" 2>&1); then
+      printf '%s\n' "$output"
+      return 0
+    fi
+
+    if printf '%s' "$output" | grep -q "still syncing with bitcoin network"; then
+      log "CLN still syncing, waiting before retrying channel open..."
+      sleep 2
+      elapsed=$((elapsed + 2))
+      continue
+    fi
+
+    printf '%s\n' "$output" >&2
+    return 1
+  done
+
+  log "ERROR: CLN did not become ready to fund a channel within ${max_wait}s"
+  return 1
+}
 
 wait_for_sync() {
   local svc="$1" max_wait="${2:-90}"
@@ -139,7 +168,7 @@ fi
 EXISTING_CLN=$(cln listpeerchannels | jq -r ".channels[] | select(.peer_id==\"$BOB_PUBKEY\" and .opener==\"local\") | .short_channel_id" | head -1)
 if [ -z "$EXISTING_CLN" ] || [ "$EXISTING_CLN" = "null" ]; then
   log "Opening CLN → Bob channel (5M sats, push 1M)..."
-  cln fundchannel "$BOB_PUBKEY" 5000000 null null null null null 1000000
+  open_cln_channel "$BOB_PUBKEY" 5000000 1000000000
 else
   log "CLN → Bob channel already exists: $EXISTING_CLN"
 fi
@@ -168,11 +197,10 @@ btc generatetoaddress 6 "$MINER_ADDR" > /dev/null
 
 log "=== Step 5: Extracting credentials ==="
 
-# LND Alice macaroon (hex) and TLS cert (base64)
+# LND Alice macaroon (hex) and TLS CA cert (base64)
 ALICE_MACAROON_HEX=$(docker compose -f "$COMPOSE_FILE" exec -T lnd-alice \
   xxd -p -c 10000 /root/.lnd/data/chain/bitcoin/regtest/admin.macaroon)
-ALICE_TLS_CERT_B64=$(docker compose -f "$COMPOSE_FILE" exec -T lnd-alice \
-  base64 -w 0 /root/.lnd/tls.cert)
+ALICE_TLS_CERT_B64=$(base64 < "$PROJECT_DIR/lnd/tls/ca.pem" | tr -d '\n')
 
 # CLN gRPC mTLS certs (base64-encoded)
 CLN_CA_CERT_B64=$(docker compose -f "$COMPOSE_FILE" exec -T cln \
@@ -181,6 +209,7 @@ CLN_CLIENT_CERT_B64=$(docker compose -f "$COMPOSE_FILE" exec -T cln \
   base64 -w 0 /root/.lightning/regtest/client.pem 2>/dev/null || echo "")
 CLN_CLIENT_KEY_B64=$(docker compose -f "$COMPOSE_FILE" exec -T cln \
   base64 -w 0 /root/.lightning/regtest/client-key.pem 2>/dev/null || echo "")
+CLN_REST_RUNE=$(cln createrune 2>/dev/null | jq -r '.rune // empty')
 
 # ─── Step 6: Write environment file ──────────────────────────────────
 
@@ -203,6 +232,8 @@ CLN_CA_CERT_BASE64=${CLN_CA_CERT_B64}
 CLN_CLIENT_CERT_BASE64=${CLN_CLIENT_CERT_B64}
 CLN_CLIENT_KEY_BASE64=${CLN_CLIENT_KEY_B64}
 CLN_PUBKEY=${CLN_PUBKEY}
+CLN_REST_URL=https://localhost:3010
+CLN_RUNE=${CLN_REST_RUNE}
 
 # LND Bob (receiver) — used by Aperture
 BOB_PUBKEY=${BOB_PUBKEY}
@@ -224,5 +255,6 @@ log "  L402 server:          http://localhost:8081 (Aperture → backend)"
 log "  Alice gRPC:           https://localhost:10009"
 log "  Alice REST:           https://localhost:8080"
 log "  CLN gRPC:             https://localhost:9736"
+log "  CLN REST:             https://localhost:3010"
 log ""
 log "=== Regtest environment ready! ==="

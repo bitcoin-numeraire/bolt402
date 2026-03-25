@@ -16,9 +16,12 @@ use tracing_subscriber::EnvFilter;
 
 static INIT: Once = Once::new();
 
-/// Initialize tracing (call once per test binary).
+/// Initialize tracing and the TLS crypto provider (call once per test binary).
 pub fn init_tracing() {
     INIT.call_once(|| {
+        // Install rustls crypto provider before any TLS connections (tonic, reqwest).
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         tracing_subscriber::fmt()
             .with_env_filter(
                 EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
@@ -73,7 +76,9 @@ pub async fn regtest_available() -> bool {
         .unwrap();
 
     match client.get(&url).send().await {
-        Ok(resp) => resp.status().is_success(),
+        // Aperture returns 402 for all routes (including /health) when it's running.
+        // A 402 means the L402 server is up and ready.
+        Ok(resp) => resp.status().is_success() || resp.status().as_u16() == 402,
         Err(_) => false,
     }
 }
@@ -150,6 +155,39 @@ pub async fn cln_backend() -> Option<bolt402_cln::ClnGrpcBackend> {
         Ok(backend) => Some(backend),
         Err(e) => {
             tracing::warn!("Failed to connect to CLN: {e}");
+            None
+        }
+    }
+}
+
+/// Create a `ClnRestBackend` (payer) from regtest environment.
+///
+/// Returns `None` if the CLN REST rune is not available or the REST API
+/// cannot be reached.
+pub async fn cln_rest_backend() -> Option<bolt402_cln::ClnRestBackend> {
+    let host =
+        std::env::var("CLN_REST_URL").unwrap_or_else(|_| "https://localhost:3010".to_string());
+
+    let rune = match std::env::var("CLN_RUNE") {
+        Ok(rune) if !rune.is_empty() => rune,
+        _ => {
+            tracing::warn!("CLN REST rune not available, skipping CLN REST tests");
+            return None;
+        }
+    };
+
+    let backend = match bolt402_cln::ClnRestBackend::with_rune(&host, &rune) {
+        Ok(backend) => backend,
+        Err(e) => {
+            tracing::warn!("Failed to create CLN REST backend: {e}");
+            return None;
+        }
+    };
+
+    match bolt402_proto::LnBackend::get_info(&backend).await {
+        Ok(_) => Some(backend),
+        Err(e) => {
+            tracing::warn!("Failed to connect to CLN REST: {e}");
             None
         }
     }

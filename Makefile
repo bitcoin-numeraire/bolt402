@@ -1,5 +1,5 @@
 .PHONY: build test lint fmt check doc clean ci \
-       regtest-up regtest-init regtest-test regtest-down regtest \
+       regtest-certs regtest-up regtest-init regtest-test regtest-down regtest-clean regtest \
        regtest-logs regtest-status
 
 # Default target
@@ -48,8 +48,12 @@ ci: fmt lint test doc
 
 REGTEST_COMPOSE := tests/regtest/docker-compose.yml
 
+# Generate TLS certs for LND nodes (idempotent)
+regtest-certs:
+	./tests/regtest/scripts/gen-lnd-tls.sh
+
 # Start the regtest Docker stack
-regtest-up:
+regtest-up: regtest-certs
 	docker compose -f $(REGTEST_COMPOSE) up -d
 
 # Initialize the regtest network (fund wallets, open channels, export env)
@@ -63,6 +67,11 @@ regtest-test:
 # Tear down the regtest stack and remove volumes
 regtest-down:
 	docker compose -f $(REGTEST_COMPOSE) down -v
+
+# Full cleanup: remove containers, volumes, generated certs, and env file
+regtest-clean: regtest-down
+	rm -rf tests/regtest/lnd/tls
+	rm -f tests/regtest/.env.regtest
 
 # Full regtest cycle: up → init → test → down
 regtest: regtest-up regtest-init regtest-test

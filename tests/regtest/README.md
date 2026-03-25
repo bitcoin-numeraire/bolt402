@@ -56,6 +56,7 @@ Client (bolt402)           Aperture (L402 proxy)           Backend
 | `lnd_grpc_flow` | LND gRPC | Full L402 flow, receipt verification, preimage hash |
 | `lnd_rest_flow` | LND REST | Same via REST, multi-endpoint sequential payments |
 | `cln_flow` | CLN gRPC | Full L402 flow, token caching |
+| `cln_rest_flow` | CLN REST | Full L402 flow, receipt verification, multi-endpoint payments |
 | `budget_enforcement` | LND REST | Per-request limits, total budget caps |
 | `token_caching` | LND REST | Cache hits skip payment, store isolation |
 | `sqlite_persistence` | LND REST | Tokens survive client restart via SQLite |
@@ -94,6 +95,7 @@ tests/regtest/
 │   ├── lnd_grpc_flow.rs
 │   ├── lnd_rest_flow.rs
 │   ├── cln_flow.rs
+│   ├── cln_rest_flow.rs
 │   ├── budget_enforcement.rs
 │   ├── token_caching.rs
 │   └── sqlite_persistence.rs
@@ -130,9 +132,3 @@ The `regtest.yml` workflow runs on every PR and push to main:
 4. Runs all Rust regtest tests
 5. Dumps logs on failure
 6. Tears down cleanly
-
-## Swissknife Tests
-
-Swissknife backend tests require a running Swissknife instance with API credentials.
-These will be separate from the regtest environment (either against a staging
-instance or a dedicated Swissknife Docker setup).

@@ -15,7 +15,7 @@ authenticator:
   network: "regtest"
   disable: false
   lndhost: "lnd-bob:10009"
-  tlspath: "/lnd/tls.cert"
+  tlspath: "/tls/bob-tls.cert"
   macdir: "/lnd/data/chain/bitcoin/regtest"
 
 services:

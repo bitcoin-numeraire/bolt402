@@ -33,11 +33,12 @@ services:
     volumes:
       - lnd-alice-data:/root/.lnd
       - ./lnd/alice.conf:/root/.lnd/lnd.conf:ro
+      - ./lnd/tls:/tls:ro
     ports:
       - "10009:10009"  # gRPC
       - "8080:8080"    # REST
     healthcheck:
-      test: ["CMD", "lncli", "--network=regtest", "getinfo"]
+      test: ["CMD", "lncli", "--network=regtest", "--tlscertpath=/tls/alice-tls.cert", "getinfo"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -52,11 +53,12 @@ services:
     volumes:
       - lnd-bob-data:/root/.lnd
       - ./lnd/bob.conf:/root/.lnd/lnd.conf:ro
+      - ./lnd/tls:/tls:ro
     ports:
       - "10010:10009"  # gRPC (different host port)
       - "8082:8080"    # REST (different host port)
     healthcheck:
-      test: ["CMD", "lncli", "--network=regtest", "getinfo"]
+      test: ["CMD", "lncli", "--network=regtest", "--tlscertpath=/tls/bob-tls.cert", "getinfo"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -65,14 +67,17 @@ services:
   cln:
     image: elementsproject/lightningd:v25.12.1
     restart: unless-stopped
+    environment:
+      LIGHTNINGD_NETWORK: regtest
     depends_on:
       bitcoind:
         condition: service_healthy
     volumes:
       - cln-data:/root/.lightning
-      - ./cln/config:/root/.lightning/regtest/config:ro
+      - ./cln/config:/root/.lightning/config:ro
     ports:
       - "9736:9736"    # gRPC
+      - "3010:3010"    # REST (clnrest)
     healthcheck:
       test: ["CMD", "lightning-cli", "--network=regtest", "getinfo"]
       interval: 5s
@@ -87,7 +92,7 @@ services:
       - ./backend:/app
     command: ["node", "server.js"]
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/health"]
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:9000/health"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -98,7 +103,7 @@ services:
   # build from source: docker build --build-arg checkout=v0.4.2 -t aperture:local
   # using the Dockerfile at https://github.com/lightninglabs/aperture
   aperture:
-    image: lightninglabs/aperture:v0.4.2
+    image: aperture:local
     restart: unless-stopped
     depends_on:
       lnd-bob:
@@ -108,10 +113,11 @@ services:
     volumes:
       - ./aperture/aperture.yaml:/root/.aperture/aperture.yaml:ro
       - lnd-bob-data:/lnd:ro
+      - ./lnd/tls:/tls:ro
     ports:
       - "8081:8081"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8081/health"]
+      test: ["CMD-SHELL", "wget -S -O /dev/null http://127.0.0.1:8081/health 2>&1 | grep -q 'HTTP/'"]
       interval: 10s
       timeout: 10s
       retries: 30
