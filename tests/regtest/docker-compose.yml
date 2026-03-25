@@ -103,7 +103,7 @@ services:
   # build from source: docker build --build-arg checkout=v0.4.2 -t aperture:local
   # using the Dockerfile at https://github.com/lightninglabs/aperture
   aperture:
-    image: aperture:local
+    image: lightninglabs/aperture:v0.4.2
     restart: unless-stopped
     depends_on:
       lnd-bob:

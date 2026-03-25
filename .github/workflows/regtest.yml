@@ -31,8 +31,7 @@ jobs:
         run: cargo test -p bolt402-regtest --no-run
 
       - name: Start Docker services
-        working-directory: tests/regtest
-        run: docker compose up -d
+        run: make regtest-up
 
       - name: Wait for services to be healthy
         working-directory: tests/regtest
@@ -52,8 +51,7 @@ jobs:
           echo "All services ready."
 
       - name: Initialize regtest network
-        working-directory: tests/regtest
-        run: ./scripts/init-regtest.sh
+        run: make regtest-init
 
       - name: Wait for Aperture to be ready
         working-directory: tests/regtest
@@ -63,16 +61,14 @@ jobs:
           echo "Aperture ready."
 
       - name: Run regtest integration tests
-        run: cargo test -p bolt402-regtest -- --nocapture
+        run: make regtest-test
         env:
           RUST_LOG: info
 
       - name: Docker logs (on failure)
         if: failure()
-        working-directory: tests/regtest
-        run: docker compose logs --tail=100
+        run: make regtest-logs
 
       - name: Teardown
         if: always()
-        working-directory: tests/regtest
-        run: docker compose down -v
+        run: make regtest-down
