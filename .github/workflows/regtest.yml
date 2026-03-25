@@ -40,10 +40,10 @@ jobs:
           docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=regtest -rpcpassword=regtest -rpcwait getblockchaininfo > /dev/null
 
           echo "Waiting for lnd-alice..."
-          timeout 120 bash -c 'until docker compose exec -T lnd-alice lncli --network=regtest getinfo 2>/dev/null; do sleep 3; done'
+          timeout 120 bash -c 'until docker compose exec -T lnd-alice lncli --network=regtest --tlscertpath=/tls/alice-tls.cert getinfo 2>/dev/null; do sleep 3; done'
 
           echo "Waiting for lnd-bob..."
-          timeout 120 bash -c 'until docker compose exec -T lnd-bob lncli --network=regtest getinfo 2>/dev/null; do sleep 3; done'
+          timeout 120 bash -c 'until docker compose exec -T lnd-bob lncli --network=regtest --tlscertpath=/tls/bob-tls.cert getinfo 2>/dev/null; do sleep 3; done'
 
           echo "Waiting for cln..."
           timeout 120 bash -c 'until docker compose exec -T cln lightning-cli --network=regtest getinfo 2>/dev/null; do sleep 3; done'
