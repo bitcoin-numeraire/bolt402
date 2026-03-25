@@ -1,0 +1,54 @@
+# Aperture configuration for bolt402 regtest integration tests.
+#
+# Aperture acts as an L402 reverse proxy in front of the backend server.
+# It uses lnd-bob (receiver) to create invoices and verify payments.
+
+listenaddr: "0.0.0.0:8081"
+insecure: true
+debuglevel: "debug"
+dbbackend: "sqlite"
+
+sqlite:
+  dbfile: "/root/.aperture/aperture.db"
+
+authenticator:
+  network: "regtest"
+  disable: false
+  lndhost: "lnd-bob:10009"
+  tlspath: "/tls/bob-tls.cert"
+  macdir: "/lnd/data/chain/bitcoin/regtest"
+
+services:
+  # 100-sat endpoint
+  - name: "data"
+    hostregexp: ".*"
+    pathregexp: "^/api/data$"
+    address: "backend:9000"
+    protocol: "http"
+    price: 100
+    authwhitelistpaths:
+      - "^/health$"
+
+  # 500-sat endpoint
+  - name: "premium"
+    hostregexp: ".*"
+    pathregexp: "^/api/premium$"
+    address: "backend:9000"
+    protocol: "http"
+    price: 500
+
+  # 10-sat endpoint
+  - name: "cheap"
+    hostregexp: ".*"
+    pathregexp: "^/api/cheap$"
+    address: "backend:9000"
+    protocol: "http"
+    price: 10
+
+  # Health endpoint (free, no L402)
+  - name: "health"
+    hostregexp: ".*"
+    pathregexp: "^/health$"
+    address: "backend:9000"
+    protocol: "http"
+    price: 0

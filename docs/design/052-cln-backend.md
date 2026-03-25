@@ -3,40 +3,49 @@
 **Issue:** #52
 **Author:** Toshi
 **Date:** 2026-03-21
-**Status:** Implementing
+**Status:** Implemented
 
 ## Problem
 
-bolt402 currently supports LND, NWC, and SwissKnife as Lightning backends. Core Lightning (CLN) is the second most widely deployed Lightning implementation, maintained by Blockstream. Users running CLN nodes cannot use bolt402 without switching implementations or using an intermediary like NWC.
+bolt402 currently supports LND, NWC, and SwissKnife as Lightning backends. Core Lightning (CLN) is the second most widely deployed Lightning implementation, maintained by Blockstream. Users running CLN nodes need first-class support for both CLN's native gRPC interface and the `clnrest` HTTP plugin used in browser and edge environments.
 
 ## Proposed Design
 
-### New Crate: `bolt402-cln`
+### Crate: `bolt402-cln`
 
 Follows the same adapter pattern as `bolt402-lnd`:
 
 - Implements `LnBackend` trait from `bolt402-proto`
 - Uses CLN's gRPC interface via `tonic` with vendored proto files
-- Supports mTLS authentication (client certificate + CA certificate)
-- Provides `ClnBackend::connect()` and `ClnBackend::from_env()` constructors
+- Uses CLN REST via the `clnrest` plugin
+- Supports mTLS authentication for gRPC and macaroon or rune authentication for REST
+- Provides `ClnGrpcBackend::connect()`, `ClnGrpcBackend::from_env()`, `ClnRestBackend::new()`, and `ClnRestBackend::with_rune()`
 
 ### Architecture
 
 ```
 bolt402-proto (LnBackend trait)
       ↑
-bolt402-cln (ClnBackend struct)
-      ↑
-CLN gRPC API (node.proto + primitives.proto)
+bolt402-cln
+  ├── ClnGrpcBackend ──► CLN gRPC API
+  └── ClnRestBackend ──► clnrest HTTP API
 ```
 
-### CLN gRPC API Mapping
+### CLN API Mapping
 
 | `LnBackend` method | CLN gRPC RPC | Notes |
 |---|---|---|
 | `pay_invoice()` | `Pay(PayRequest)` | Returns `PayResponse` with preimage, amounts |
 | `get_balance()` | `ListFunds(ListfundsRequest)` | Sum `our_amount_msat` across channels |
 | `get_info()` | `Getinfo(GetinfoRequest)` | Returns node id, alias, active channels |
+
+The REST backend maps to the same CLN operations through `clnrest` endpoints:
+
+| `LnBackend` method | CLN REST endpoint | Notes |
+|---|---|---|
+| `pay_invoice()` | `POST /v1/pay` | Sends `bolt11` and fee limits |
+| `get_balance()` | `POST /v1/listfunds` | Sums spendable channel balances |
+| `get_info()` | `POST /v1/getinfo` | Returns node metadata |
 
 ### Key Design Decisions
 
@@ -59,19 +68,27 @@ CLN gRPC API (node.proto + primitives.proto)
 ### API Sketch
 
 ```rust
-use bolt402_cln::ClnBackend;
+use bolt402_cln::{ClnGrpcBackend, ClnRestBackend};
 
 // Direct connection
-let backend = ClnBackend::connect(
+let grpc = ClnGrpcBackend::connect(
     "https://localhost:9736",
     "/path/to/ca.pem",
     "/path/to/client.pem",
     "/path/to/client-key.pem",
 ).await?;
 
-// From environment variables
-let backend = ClnBackend::from_env().await?;
-// Reads: CLN_GRPC_HOST, CLN_CA_CERT_PATH, CLN_CLIENT_CERT_PATH, CLN_CLIENT_KEY_PATH
+// REST with macaroon auth
+let rest = ClnRestBackend::new(
+    "https://localhost:3010",
+    "hex-encoded-access-macaroon",
+)?;
+
+// REST with rune auth
+let rest = ClnRestBackend::with_rune(
+    "https://localhost:3010",
+    "rune-token-value...",
+)?;
 ```
 
 ### Error Types
@@ -102,7 +119,7 @@ Maps to `ClientError` via `From<ClnError>`:
 - Unit tests: error type conversions, config validation, debug format (no secret leaks)
 - `from_env()` tests: missing env vars, invalid values
 - Invalid connection tests: bad URIs, bad cert paths
-- Integration testing: would require a live CLN node (out of scope for CI, can test manually)
+- Regtest integration testing in `tests/regtest/` covering CLN gRPC and CLN REST through Aperture
 
 ### File Structure
 
@@ -115,6 +132,7 @@ crates/bolt402-cln/
 │   └── primitives.proto
 └── src/
     ├── lib.rs         # Re-exports, generated module includes
-    ├── backend.rs     # ClnBackend implementation
+    ├── grpc.rs        # ClnGrpcBackend implementation
+    ├── rest.rs        # ClnRestBackend implementation
     └── error.rs       # ClnError type
 ```

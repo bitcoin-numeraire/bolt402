@@ -1,0 +1,58 @@
+[package]
+name = "bolt402-regtest"
+description = "Regtest integration tests for the bolt402 L402 client SDK"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+
+# This crate has no library — it only contains integration tests.
+[lib]
+name = "regtest_helpers"
+path = "src/lib.rs"
+
+[[test]]
+name = "lnd_grpc_flow"
+path = "tests/lnd_grpc_flow.rs"
+
+[[test]]
+name = "lnd_rest_flow"
+path = "tests/lnd_rest_flow.rs"
+
+[[test]]
+name = "cln_flow"
+path = "tests/cln_flow.rs"
+
+[[test]]
+name = "cln_rest_flow"
+path = "tests/cln_rest_flow.rs"
+
+[[test]]
+name = "budget_enforcement"
+path = "tests/budget_enforcement.rs"
+
+[[test]]
+name = "token_caching"
+path = "tests/token_caching.rs"
+
+[[test]]
+name = "sqlite_persistence"
+path = "tests/sqlite_persistence.rs"
+
+[dependencies]
+bolt402-proto = { workspace = true }
+bolt402-core = { workspace = true }
+bolt402-lnd = { workspace = true, features = ["grpc", "rest"] }
+bolt402-cln = { workspace = true, features = ["grpc", "rest"] }
+bolt402-sqlite = { workspace = true }
+tokio = { workspace = true, features = ["full", "test-util"] }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tempfile = "3"
+dotenvy = "0.15"
+base64 = { version = "0.22" }
+hex = { version = "0.4" }
+sha2 = { version = "0.10" }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }

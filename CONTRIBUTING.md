@@ -36,9 +36,9 @@ For the TypeScript package:
 
 ```bash
 cd packages/bolt402-ai-sdk
-npm ci
-npx tsc --noEmit
-npx vitest run
+yarn install
+yarn typecheck
+yarn test
 ```
 
 Or use the Makefile shortcuts:
@@ -55,11 +55,18 @@ bolt402/
 ├── crates/
 │   ├── bolt402-proto/       # L402 protocol types, parsing, token construction
 │   ├── bolt402-core/        # Client engine, ports (traits), adapters
-│   ├── bolt402-lnd/         # LND gRPC backend adapter
+│   ├── bolt402-lnd/         # LND backends (gRPC + REST)
+│   ├── bolt402-cln/         # CLN backends (gRPC + REST)
+│   ├── bolt402-nwc/         # Nostr Wallet Connect backend adapter
 │   ├── bolt402-swissknife/  # SwissKnife REST backend adapter
-│   └── bolt402-mock/        # Mock L402 server for testing
+│   ├── bolt402-mock/        # Mock L402 server for testing
+│   ├── bolt402-sqlite/      # SQLite token store
+│   ├── bolt402-ffi/         # C-compatible FFI layer
+│   ├── bolt402-python/      # Python bindings
+│   └── bolt402-wasm/        # WebAssembly bindings
 ├── packages/
-│   └── bolt402-ai-sdk/      # Vercel AI SDK integration (TypeScript)
+│   ├── bolt402-ai-sdk/      # Vercel AI SDK integration (TypeScript)
+│   └── bolt402-langchain/   # LangChain integration (Python package)
 ├── docs/
 │   └── design/              # Design documents for each feature
 ├── AGENTS.md                # Architecture overview
@@ -178,11 +185,20 @@ mod tests {
 
 The `bolt402-mock` crate provides a mock L402 server for integration testing. See `crates/bolt402-mock/tests/` for examples.
 
+For the Docker-based regtest suite against Aperture:
+
+```bash
+make regtest-up
+make regtest-init
+make regtest-test
+make regtest-down
+```
+
 ### TypeScript Tests
 
 ```bash
 cd packages/bolt402-ai-sdk
-npx vitest run
+yarn test
 ```
 
 ## Design Documents

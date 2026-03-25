@@ -1,0 +1,21 @@
+network=regtest
+alias=bolt402-cln
+log-level=info
+
+# Bitcoin connection
+bitcoin-rpcconnect=bitcoind
+bitcoin-rpcport=18443
+bitcoin-rpcuser=regtest
+bitcoin-rpcpassword=regtest
+
+# Network
+addr=0.0.0.0:9735
+announce-addr=cln:9735
+
+# gRPC plugin (for bolt402-cln backend tests)
+grpc-host=0.0.0.0
+grpc-port=9736
+
+# REST plugin (clnrest)
+clnrest-port=3010
+clnrest-host=0.0.0.0

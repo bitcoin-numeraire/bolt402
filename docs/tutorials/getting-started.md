@@ -62,7 +62,7 @@ The `L402Client` handles the full payment flow automatically. It needs:
 - A **budget** (spending limits)
 
 ```rust
-use bolt402_core::{L402Client, L402ClientConfig};
+use bolt402_core::L402Client;
 use bolt402_core::budget::Budget;
 use bolt402_core::cache::InMemoryTokenStore;
 

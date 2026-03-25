@@ -26,8 +26,8 @@ bolt402 fills that gap.
 │  Budget Tracker ── Receipt Logger   │
 │       │                             │
 │  Lightning Backend (pluggable)      │
-│  ├── LND (gRPC)                     │
-│  ├── CLN (gRPC)                     │
+│  ├── LND (gRPC + REST)              │
+│  ├── CLN (gRPC + REST)              │
 │  ├── NWC (Nostr Wallet Connect)     │
 │  ├── SwissKnife (REST)              │
 │  ├── Mock (testing)                 │
@@ -46,12 +46,12 @@ See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
 | [`bolt402-proto`](crates/bolt402-proto) | L402 protocol types, port traits (`LnBackend`, `TokenStore`), `ClientError`. WASM-safe, no async runtime dependency. | ✅ Complete |
 | [`bolt402-core`](crates/bolt402-core) | L402 client engine (`L402Client`), budget tracker, in-memory token cache, receipts. No async runtime dependency (WASM-compatible). | ✅ Complete |
 | [`bolt402-lnd`](crates/bolt402-lnd) | LND backend: gRPC (feature `grpc`) + REST (feature `rest`, WASM-compatible) | ✅ Complete |
-| [`bolt402-cln`](crates/bolt402-cln) | Core Lightning (CLN) gRPC backend adapter | ✅ Complete |
+| [`bolt402-cln`](crates/bolt402-cln) | Core Lightning (CLN) backends: gRPC (feature `grpc`) + REST (feature `rest`, WASM-compatible) | ✅ Complete |
 | [`bolt402-nwc`](crates/bolt402-nwc) | Nostr Wallet Connect (NIP-47) backend adapter | ✅ Complete |
 | [`bolt402-swissknife`](crates/bolt402-swissknife) | SwissKnife REST backend adapter (WASM-compatible) | ✅ Complete |
 | [`bolt402-mock`](crates/bolt402-mock) | Mock L402 server for testing (no real Lightning needed) | ✅ Complete |
 | [`bolt402-sqlite`](crates/bolt402-sqlite) | SQLite persistent token store (survives restarts) | ✅ Complete |
-| [`bolt402-wasm`](crates/bolt402-wasm) | WebAssembly bindings: wraps LND REST + SwissKnife backends, plus in-process mock | ✅ Complete |
+| [`bolt402-wasm`](crates/bolt402-wasm) | WebAssembly bindings: Rust L402 client plus direct LND REST, CLN REST, and SwissKnife backend wrappers | ✅ Complete |
 | [`bolt402-ai-sdk`](packages/bolt402-ai-sdk) | Vercel AI SDK tools (TypeScript). Thin wrapper around bolt402-wasm — all L402 logic in Rust/WASM | ✅ Complete |
 | [`bolt402-ffi`](crates/bolt402-ffi) | C-compatible FFI layer for Go/Swift/Kotlin bindings | ✅ Complete |
 | [`bolt402-python`](crates/bolt402-python) | Python bindings via PyO3 | ✅ Complete |
@@ -61,15 +61,16 @@ See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
 ## Quick Start (Rust)
 
 ```rust
-use bolt402_core::{L402Client, L402ClientConfig};
+use bolt402_core::L402Client;
 use bolt402_core::budget::Budget;
 use bolt402_core::cache::InMemoryTokenStore;
-use bolt402_lnd::LndBackend;
+use bolt402_lnd::LndGrpcBackend;
 
 #[tokio::main]
 async fn main() {
-    let backend = LndBackend::new(
+    let backend = LndGrpcBackend::connect(
         "https://localhost:10009",
+        "/path/to/tls.cert",
         "/path/to/admin.macaroon",
     ).await.unwrap();
 
@@ -185,7 +186,7 @@ cargo doc --no-deps  # Build docs
 
 - [x] Core L402 client engine (hexagonal architecture)
 - [x] LND gRPC backend adapter
-- [x] CLN (Core Lightning) gRPC backend adapter
+- [x] CLN (Core Lightning) backends: gRPC + REST
 - [x] Nostr Wallet Connect (NWC/NIP-47) backend adapter
 - [x] SwissKnife REST backend adapter
 - [x] Mock L402 server for testing
@@ -201,8 +202,8 @@ cargo doc --no-deps  # Build docs
 - [x] AI Research Agent demo
 - [x] bolt402 vs lnget comparison page
 - [x] Comprehensive documentation and tutorials
-
 - [x] LangChain Python integration (L402FetchTool, L402BudgetTool, PaymentCallbackHandler)
+- [x] Regtest integration suite against Aperture (LND gRPC/REST, CLN gRPC/REST)
 
 ### Upcoming
 
@@ -210,7 +211,6 @@ cargo doc --no-deps  # Build docs
 - [x] Align all crates, examples, and tutorials with proto/core split (#65)
 - [ ] Node.js/TypeScript integration tests for bolt402-wasm (#66)
 - [ ] MPP (Tempo) protocol support (#67)
-- [ ] CLN REST backend adapter
 - [ ] Package publishing (crates.io, PyPI, npm)
 
 ## License

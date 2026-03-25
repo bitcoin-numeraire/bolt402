@@ -12,8 +12,9 @@ bolt402 follows **hexagonal architecture** (ports and adapters), inspired by dom
      ┌──────────┤      │      │      │     └──────────┐
      │          │      │      │      │                │
 bolt402-lnd  bolt402-  │  bolt402-  bolt402-    bolt402-wasm
- (gRPC+REST) swissknife│   cln      nwc        (WASM bindings)
+ (gRPC+REST) swissknife│ (gRPC+REST) nwc       (WASM bindings)
      │          │      │                         wraps: lnd(rest),
+     │          │      │                         cln(rest),
      │          │      │                         swissknife
      │          │      │
      └─────┬────┘      │
@@ -32,11 +33,11 @@ bolt402-lnd  bolt402-  │  bolt402-  bolt402-    bolt402-wasm
 | `bolt402-proto` | Shared protocol types: `L402Challenge`, `L402Token`, `L402Error`, `ClientError`. **Also owns all port traits** (`LnBackend`, `TokenStore`) and shared domain types (`PaymentResult`, `NodeInfo`). No async runtime dependency (no tokio). WASM-safe. |
 | `bolt402-core` | The L402 client engine. Contains `L402Client` (HTTP orchestration with reqwest), `BudgetTracker`, `InMemoryTokenStore`, and `Receipt`. Depends on `bolt402-proto` for port traits and shared types. |
 | `bolt402-lnd` | Implements `LnBackend` for LND. Two feature-gated backends: `grpc` (tonic, requires tokio) and `rest` (reqwest, WASM-compatible). Depends on `bolt402-proto` only. |
-| `bolt402-cln` | Implements `LnBackend` for Core Lightning (CLN) via gRPC with mTLS. |
+| `bolt402-cln` | Implements `LnBackend` for Core Lightning (CLN). Supports gRPC with mTLS and REST via the `clnrest` plugin (macaroon or rune auth, WASM-compatible). |
 | `bolt402-nwc` | Implements `LnBackend` for Nostr Wallet Connect (NIP-47). |
 | `bolt402-swissknife` | Implements `LnBackend` for Numeraire SwissKnife via REST API. Depends on `bolt402-proto` only. WASM-compatible. |
 | `bolt402-mock` | A mock L402 server and mock Lightning backend for testing. No real Lightning infrastructure needed. |
-| `bolt402-wasm` | WebAssembly bindings via `wasm-bindgen`. Wraps `bolt402-lnd` (REST) and `bolt402-swissknife` as `WasmLndRestBackend` and `WasmSwissKnifeBackend`. Also provides an in-process mock L402 client for demos/testing. Depends on `bolt402-proto` + backend crates directly (not `bolt402-core`). |
+| `bolt402-wasm` | WebAssembly bindings via `wasm-bindgen`. Exposes `WasmL402Client` (full Rust L402 engine) plus direct backend wrappers for LND REST, CLN REST, and SwissKnife. Depends on `bolt402-core`, `bolt402-proto`, and backend crates. |
 | `bolt402-sqlite` | Persistent `TokenStore` implementation using SQLite. |
 | `bolt402-ai-sdk` | TypeScript package providing Vercel AI SDK tools. Thin wrapper around `WasmL402Client` from `bolt402-wasm` — all L402 logic in Rust/WASM. |
 
@@ -83,10 +84,11 @@ Each adapter lives in its own crate:
 | `LnBackend` | LND gRPC | `bolt402-lnd` (feature `grpc`) | No |
 | `LnBackend` | LND REST | `bolt402-lnd` (feature `rest`) | Yes |
 | `LnBackend` | CLN gRPC | `bolt402-cln` | No |
+| `LnBackend` | CLN REST | `bolt402-cln` (feature `rest`) | Yes |
 | `LnBackend` | NWC (NIP-47) | `bolt402-nwc` | No |
 | `LnBackend` | SwissKnife REST | `bolt402-swissknife` | Yes |
 | `LnBackend` | Mock (for testing) | `bolt402-mock` | No |
-| `TokenStore` | In-memory LRU cache | `bolt402-core` (built-in) | No |
+| `TokenStore` | In-memory LRU cache | `bolt402-core` (built-in) | Yes |
 | `TokenStore` | SQLite | `bolt402-sqlite` | No |
 
 You can implement your own adapters for LDK or any other Lightning implementation. See the [Custom Backend Tutorial](tutorials/custom-backend.md).
@@ -100,13 +102,13 @@ bolt402-wasm
   ├── bolt402-core           (L402Client engine — no async runtime)
   ├── bolt402-proto          (types, ports, errors — no async runtime)
   ├── bolt402-lnd[rest]      (reqwest → browser fetch on WASM)
+  ├── bolt402-cln[rest]      (reqwest → browser fetch on WASM)
   └── bolt402-swissknife     (reqwest → browser fetch on WASM)
 ```
 
 `bolt402-wasm` exposes:
-- **`WasmL402Client`**: Wraps the real `bolt402-core::L402Client` via `Rc<L402Client>` (same pattern as bdk-wasm's `Wallet`). Factory methods `withLndRest()` and `withSwissKnife()` construct the full client with Rust backends, budget tracker, and in-memory token cache. All L402 protocol logic runs in Rust.
-- **`WasmLndRestBackend`** / **`WasmSwissKnifeBackend`**: Direct wasm-bindgen wrappers around the Rust backends for standalone use.
-- **`WasmMockServer`** / **`WasmMockClient`**: In-process mock L402 environment for testing and demos. No HTTP server needed.
+- **`WasmL402Client`**: Wraps the real `bolt402-core::L402Client` via `Rc<L402Client>`. Factory methods `withLndRest()` and `withSwissKnife()` construct the full client with Rust backends, budget tracker, and in-memory token cache. All L402 protocol logic runs in Rust.
+- **`WasmLndRestBackend`** / **`WasmClnRestBackend`** / **`WasmSwissKnifeBackend`**: Direct wasm-bindgen wrappers around the Rust backends for standalone use.
 - **Utility functions**: `parseL402Challenge()`, `buildL402Header()`, `version()`.
 
 The TypeScript `bolt402-ai-sdk` package is a thin wrapper: it creates Vercel AI SDK tool definitions that delegate to `WasmL402Client`. No L402 protocol logic in TypeScript.

@@ -1,6 +1,6 @@
 # Design Doc 003: LND gRPC Backend Adapter
 
-**Status:** Proposed
+**Status:** Implemented
 **Issue:** #4
 **Author:** Toshi
 
@@ -14,12 +14,12 @@ widely deployed Lightning implementation and the one used by Lightning Labs
 
 ### Crate: bolt402-lnd
 
-Implements `LnBackend` trait from bolt402-core using LND's gRPC API.
+Implements `LnBackend` from `bolt402-proto` using LND's gRPC API, and now also ships a feature-gated REST adapter for WASM/browser environments.
 
 ### Architecture
 
 ```
-LndBackend
+LndGrpcBackend
 ├── tonic gRPC channel (TLS + macaroon auth)
 ├── LND endpoint URL
 ├── TLS certificate
@@ -30,8 +30,8 @@ LndBackend
 
 ```rust
 #[async_trait]
-impl LnBackend for LndBackend {
-    async fn pay_invoice(&self, invoice: &str, max_fee_sats: Option<u64>)
+impl LnBackend for LndGrpcBackend {
+    async fn pay_invoice(&self, invoice: &str, max_fee_sats: u64)
         -> Result<PaymentResult, ClientError>;
 
     async fn get_balance(&self) -> Result<u64, ClientError>;
@@ -40,8 +40,8 @@ impl LnBackend for LndBackend {
 }
 ```
 
-- `pay_invoice`: Calls `lnrpc.Lightning/SendPaymentSync` with the BOLT11 invoice.
-  Respects `max_fee_sats` via the `fee_limit` field. Returns preimage on success.
+- `pay_invoice`: Calls `routerrpc.Router/SendPaymentV2` with the BOLT11 invoice.
+  Respects `max_fee_sats` via `fee_limit_sat` and returns preimage plus payment hash on success.
 - `get_balance`: Calls `lnrpc.Lightning/ChannelBalance`, returns local balance in sats.
 - `get_info`: Calls `lnrpc.Lightning/GetInfo`, returns alias and pubkey.
 
@@ -52,13 +52,12 @@ Two options:
 2. **Pre-generated code** checked into the repo (no build dependency)
 3. **Use tonic-lnd crate** if one exists and is maintained
 
-Decision: Use `fedimint-tonic-lnd` crate (maintained, wraps LND protos, used by
-the Fedimint ecosystem). Avoids vendoring .proto files.
+Decision: vendor the required `.proto` files in-repo and generate code at build time.
 
 ### Configuration
 
 ```rust
-let backend = LndBackend::connect(
+let backend = LndGrpcBackend::connect(
     "https://localhost:10009",
     "/path/to/tls.cert",
     "/path/to/admin.macaroon",

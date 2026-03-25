@@ -7,7 +7,7 @@
 
 ## Problem
 
-bolt402 has native bindings for Python (PyO3), Go (CGo/FFI), and TypeScript (pure). However, the TypeScript package (`bolt402-ai-sdk`) was a pure TS implementation that duplicated protocol logic. Browser-based and edge-runtime AI agents cannot use the Rust core directly.
+Before the WASM work, `bolt402-ai-sdk` carried a pure TypeScript implementation that duplicated protocol logic from Rust. Browser-based and edge-runtime AI agents could not reuse the Rust core directly.
 
 WASM bindings complete the cross-language story by enabling:
 
@@ -31,10 +31,10 @@ A wasm-bindgen wrapper that exposes both **real Lightning backends** (via Rust, 
                             │ wasm-bindgen
                   ┌─────────▼───────────┐
                   │    bolt402-wasm     │
+                  │   WasmL402Client    │
                   │  WasmLndRestBackend │
-                  │  WasmSwissKnife..  │
-                  │  WasmMockServer    │
-                  │  WasmMockClient    │
+                  │  WasmClnRestBackend │
+                  │ WasmSwissKnifeBack. │
                   └─────────┬───────────┘
                             │
               ┌─────────────┼───────────────┐
@@ -46,7 +46,7 @@ A wasm-bindgen wrapper that exposes both **real Lightning backends** (via Rust, 
     └────────────┘
 ```
 
-**Key insight:** `bolt402-wasm` depends on `bolt402-proto` + backend crates directly, **not** `bolt402-core`. This avoids pulling in tokio (which `bolt402-core` uses for `RwLock`). The backends use `reqwest` which compiles to browser `fetch` on `wasm32-unknown-unknown`.
+**Key insight:** `bolt402-core` is WASM-safe after moving off a tokio runtime dependency, so `bolt402-wasm` can wrap the real Rust `L402Client` directly while still exposing standalone backend bindings. The REST backends use `reqwest`, which compiles to browser `fetch` on `wasm32-unknown-unknown`.
 
 ### Key Decisions
 
@@ -54,36 +54,34 @@ A wasm-bindgen wrapper that exposes both **real Lightning backends** (via Rust, 
 
 2. **No tokio in WASM path** — Port traits (`LnBackend`, `TokenStore`) and `ClientError` live in `bolt402-proto` (no async runtime dependency). Backend crates (`bolt402-lnd[rest]`, `bolt402-swissknife`) depend only on `bolt402-proto`. This was achieved by moving ports from `bolt402-core` to `bolt402-proto`.
 
-3. **Real backends compiled to WASM** — `bolt402-lnd` (REST feature) and `bolt402-swissknife` both use `reqwest`, which compiles to `wasm32-unknown-unknown` using browser `fetch`. No JS callback delegation needed. Wrapped as `WasmLndRestBackend` and `WasmSwissKnifeBackend`.
+3. **Real backends compiled to WASM** — `bolt402-lnd` (REST feature), `bolt402-cln` (REST feature), and `bolt402-swissknife` all use `reqwest`, which compiles to `wasm32-unknown-unknown` using browser `fetch`. No JS callback delegation needed. Wrapped as `WasmLndRestBackend`, `WasmClnRestBackend`, and `WasmSwissKnifeBackend`.
 
 4. **Conditional async_trait** — Port traits use `#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]` because `reqwest::Response` is not `Send` on WASM targets.
 
 5. **Conditional platform APIs** — `danger_accept_invalid_certs()` and `from_env()` are gated behind `#[cfg(not(target_arch = "wasm32"))]` since they don't apply in browsers.
 
-6. **In-process mock for testing** — `WasmMockServer` + `WasmMockClient` simulate the full L402 flow without any HTTP server. Uses `js_sys::Math::random()` for randomness and `js_sys::Date::now()` for timestamps on WASM targets.
+6. **Rust L402 client first** — `WasmL402Client` wraps the real `bolt402-core::L402Client`, so challenge parsing, token caching, budget enforcement, and receipts all stay in one implementation.
 
-7. **Budget in WASM** — Full budget enforcement (per-request, hourly, daily, total) using `js_sys::Date` for timestamps instead of `SystemTime` (which panics in WASM).
+7. **Budget in WASM** — Full budget enforcement (per-request, hourly, daily, total) works through the shared Rust `BudgetTracker`.
 
 ### API Surface
 
 ```typescript
-// Real LND REST backend (makes actual HTTP calls via fetch)
-const lnd = new WasmLndRestBackend("https://localhost:8080", "deadbeef...");
-const info = await lnd.getInfo();
-const payment = await lnd.payInvoice("lnbc...", 100);
+// Full L402 client over LND REST
+const client = WasmL402Client.withLndRest(
+  "https://localhost:8080",
+  "deadbeef...",
+  WasmBudgetConfig.unlimited(),
+  100,
+);
+const response = await client.get("https://api.example.com/data");
 
-// Real SwissKnife backend
-const sk = new WasmSwissKnifeBackend("https://app.numeraire.tech", "sk-...");
-
-// Mock server (in-process, no HTTP)
-const server = new WasmMockServer({ "/api/data": 10n });
-const client = new WasmMockClient(server, 100n);
-const response = client.get("/api/data");
-// response.status === 200, response.paid === true
-
-// Budget
-const budget = new WasmBudget(1000n, null, 50000n, null);
-const budgetedClient = WasmMockClient.withBudget(server, 100n, budget);
+// Direct CLN REST backend
+const cln = WasmClnRestBackend.withRune(
+  "https://localhost:3010",
+  "rune-token-value...",
+);
+const info = await cln.getInfo();
 
 // Utilities
 const { macaroon, invoice } = parseL402Challenge(headerValue);
@@ -96,8 +94,9 @@ const header = buildL402Header(macaroon, preimage);
 crates/bolt402-wasm/
 ├── Cargo.toml
 ├── src/
-│   ├── lib.rs          # Mock server/client, utilities, wasm-bindgen exports
-│   └── backends.rs     # WasmLndRestBackend, WasmSwissKnifeBackend wrappers
+│   ├── lib.rs          # Entry points and wasm-bindgen exports
+│   ├── client.rs       # WasmL402Client, WasmBudgetConfig, receipts/responses
+│   └── backends.rs     # WasmLndRestBackend, WasmClnRestBackend, WasmSwissKnifeBackend
 ├── tests/
 │   └── web.rs          # wasm-pack test (headless browser)
 └── README.md

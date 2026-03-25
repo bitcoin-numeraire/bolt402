@@ -3,6 +3,7 @@
 **Issue:** #5
 **Author:** Toshi
 **Date:** 2026-03-15
+**Status:** Implemented (Tier 1 + Tier 2)
 
 ## Problem
 
@@ -49,7 +50,7 @@ crates/bolt402-mock/
 - **Tests in bolt402-mock crate**: Integration tests live in `bolt402-mock/tests/` because the mock crate already depends on both `bolt402-core` and `bolt402-proto`, providing access to all components without extra dependencies. Workspace-root `tests/` doesn't work in Cargo workspaces (no owning package).
 - **Single test file**: All integration tests in one file to share helper setup code and keep CI fast (one test binary).
 - **Demo as mock example**: The demo binary lives in `bolt402-mock/examples/` since it demonstrates the mock server + client workflow.
-- **No Docker/regtest yet**: Tier 2 (regtest) is a stretch goal for a future PR. This PR focuses on Tier 1.
+- **Tier 2 is now implemented**: Docker/regtest coverage lives in `tests/regtest/` and exercises the full Aperture-backed flow across LND gRPC, LND REST, CLN gRPC, and CLN REST.
 
 ## Alternatives Considered
 
@@ -60,4 +61,5 @@ crates/bolt402-mock/
 
 - `cargo test -p bolt402-mock --test integration` runs all Tier 1 tests
 - `cargo run -p bolt402-mock --example demo` runs the interactive demo
+- `make regtest-up && make regtest-init && make regtest-test` runs the Tier 2 Docker/Aperture suite
 - CI already runs `cargo test` which picks up all tests including integration

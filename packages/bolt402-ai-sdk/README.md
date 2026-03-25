@@ -13,7 +13,12 @@ bolt402-ai-sdk wraps this flow into [Vercel AI SDK tools](https://ai-sdk.dev/doc
 ## Install
 
 ```bash
-npm install bolt402-ai-sdk bolt402-wasm ai zod
+# In this repo
+cd packages/bolt402-ai-sdk
+yarn install
+
+# After npm publishing lands
+# npm install bolt402-ai-sdk bolt402-wasm ai zod
 ```
 
 ## Quick Start

@@ -4,7 +4,7 @@ Demonstrates an AI agent that autonomously pays for L402-gated APIs using the Ve
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - An OpenAI API key (or any Vercel AI SDK-compatible provider)
 - An LND node with REST API access (or a SwissKnife account)
 
@@ -12,7 +12,7 @@ Demonstrates an AI agent that autonomously pays for L402-gated APIs using the Ve
 
 ```bash
 cd examples/ai-agent
-npm install
+yarn install
 ```
 
 Create a `.env` file:
