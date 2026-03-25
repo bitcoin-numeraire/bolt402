@@ -39,13 +39,13 @@ Client (bolt402)           Aperture (L402 proxy)           Backend
               │       └──────────┘    └─────────┘
               │            │
          bolt402 client tests
-         (gRPC, REST, CLN)
+         (LND gRPC/REST, CLN gRPC/REST)
 ```
 
 - **bitcoind** — regtest chain
 - **lnd-alice** — payer node for LND backend tests (gRPC + REST)
 - **lnd-bob** — receiver node, Aperture creates invoices here
-- **cln** — payer node for CLN backend tests (gRPC mTLS)
+- **cln** — payer node for CLN backend tests (gRPC mTLS + REST via `clnrest`)
 - **aperture** — Lightning Labs' reference L402 reverse proxy (v0.4.2)
 - **backend** — simple Node.js HTTP server behind Aperture
 
@@ -67,19 +67,19 @@ Client (bolt402)           Aperture (L402 proxy)           Backend
 # From the repo root:
 
 # 1. Bring up Docker services
-docker compose -f tests/regtest/docker-compose.yml up -d
+make regtest-up
 
 # 2. Initialize network (fund wallets, open channels, export creds)
-./tests/regtest/scripts/init-regtest.sh
+make regtest-init
 
 # 3. Run all regtest tests
-cargo test -p bolt402-regtest -- --nocapture
+make regtest-test
 
 # 4. Run a single suite
-cargo test -p bolt402-regtest --test lnd_grpc_flow -- --nocapture
+cargo test -p bolt402-regtest --test cln_rest_flow -- --nocapture
 
 # 5. Teardown
-docker compose -f tests/regtest/docker-compose.yml down -v
+make regtest-down
 ```
 
 ## Layout

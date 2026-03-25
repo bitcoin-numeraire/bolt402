@@ -2,6 +2,7 @@
   "name": "bolt402-ai-agent-example",
   "private": true,
   "type": "module",
+  "packageManager": "yarn@4.13.0",
   "scripts": {
     "start": "tsx index.ts"
   },
@@ -9,6 +10,7 @@
     "@ai-sdk/openai": "^3.0.41",
     "ai": "^6.0.116",
     "bolt402-ai-sdk": "file:../../packages/bolt402-ai-sdk",
+    "bolt402-wasm": "file:../../crates/bolt402-wasm/pkg",
     "zod": "^3.25.76"
   },
   "devDependencies": {

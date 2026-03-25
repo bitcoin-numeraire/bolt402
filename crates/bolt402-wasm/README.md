@@ -6,67 +6,117 @@ WebAssembly bindings for the [bolt402](https://github.com/bitcoin-numeraire/bolt
 
 bolt402-wasm compiles the Rust L402 protocol engine to WebAssembly via `wasm-pack`, providing:
 
-- **In-process mock L402 server** — test L402 flows without any HTTP server or Lightning node
-- **Full L402 protocol flow** — challenge parsing, payment simulation, token caching, budget enforcement
-- **Payment receipts** — structured proof-of-payment data for audit and cost tracking
+- **`WasmL402Client`** — the real Rust `L402Client`, compiled to WASM
+- **Direct backend wrappers** — `WasmLndRestBackend`, `WasmClnRestBackend`, and `WasmSwissKnifeBackend`
+- **Budget configuration and receipts** — shared Rust behavior for spending limits and audit data
 - **Auto-generated TypeScript types** — full type safety in TS/JS projects
 
 ## Quick Start
 
 ```javascript
-import init, { WasmMockServer, WasmMockClient, WasmBudget } from 'bolt402-wasm';
+import init, { WasmL402Client, WasmBudgetConfig } from 'bolt402-wasm';
 
 // Initialize the WASM module
 await init();
 
-// Create a mock server with priced endpoints
-const server = new WasmMockServer({
-  "/api/data": 10,      // 10 sats
-  "/api/premium": 100,  // 100 sats
-});
-
-// Create a client connected to the mock server
-const client = new WasmMockClient(server, 100n); // max 100 sat fee
+// Create a client backed by LND REST
+const client = WasmL402Client.withLndRest(
+  'https://localhost:8080',
+  'hex-encoded-admin-macaroon',
+  WasmBudgetConfig.unlimited(),
+  100,
+);
 
 // Make a request — L402 payment happens automatically
-const response = client.get("/api/data");
+const response = await client.get('https://api.example.com/paid-resource');
 console.log(response.status);   // 200
-console.log(response.paid);     // true
-console.log(response.body);     // '{"ok":true,"price":10}'
+console.log(response.paid);     // true or false if cached
+console.log(response.body);
 
 // Inspect the payment receipt
 const receipt = response.receipt;
-console.log(receipt.amountSats);    // 10n
+console.log(receipt.amountSats);
 console.log(receipt.paymentHash);   // hex string
 console.log(receipt.preimage);      // hex string
 
 // Token caching: second request uses cached token (no payment)
-const cached = client.get("/api/data");
+const cached = await client.get('https://api.example.com/paid-resource');
 console.log(cached.paid);  // false (used cached token)
 
 // Track spending
-console.log(client.totalSpent);    // 10n
-console.log(client.paymentCount);  // 1
+console.log(await client.totalSpent);
+console.log(await client.receipts());
 ```
 
 ## Budget Enforcement
 
 ```javascript
-const budget = new WasmBudget(
-  100n,    // per-request max: 100 sats
-  1000n,   // hourly max: 1,000 sats
-  5000n,   // daily max: 5,000 sats
-  50000n,  // total max: 50,000 sats
+const budget = new WasmBudgetConfig(
+  100,     // per-request max: 100 sats
+  1000,    // hourly max: 1,000 sats
+  5000,    // daily max: 5,000 sats
+  50000,   // total max: 50,000 sats
 );
 
-const client = WasmMockClient.withBudget(server, 100n, budget);
+const client = WasmL402Client.withLndRest(
+  'https://localhost:8080',
+  'hex-encoded-admin-macaroon',
+  budget,
+  100,
+);
 
-// Requests exceeding the budget will throw an error
+// Requests exceeding the budget will reject
 try {
-  client.get("/api/expensive"); // > 100 sats
+  await client.get('https://api.example.com/expensive');
 } catch (e) {
   console.error(e); // "payment of X sats exceeds per-request limit"
 }
+```
+
+## Direct Backend Wrappers
+
+Use the backend wrappers when you want Lightning-node access from JS/TS without going through the full `WasmL402Client` flow.
+
+### LND REST
+
+```javascript
+import init, { WasmLndRestBackend } from 'bolt402-wasm';
+
+await init();
+
+const lnd = new WasmLndRestBackend('https://localhost:8080', 'deadbeef...');
+const info = await lnd.getInfo();
+console.log(info.alias);
+```
+
+### CLN REST
+
+```javascript
+import init, { WasmClnRestBackend } from 'bolt402-wasm';
+
+await init();
+
+const cln = WasmClnRestBackend.withRune(
+  'https://localhost:3010',
+  'rune-token-value...',
+);
+const info = await cln.getInfo();
+console.log(info.alias);
+```
+
+### SwissKnife
+
+```javascript
+import init, { WasmSwissKnifeBackend } from 'bolt402-wasm';
+
+await init();
+
+const backend = new WasmSwissKnifeBackend(
+  'https://app.numeraire.tech',
+  'sk-...',
+);
+const balance = await backend.getBalance();
+console.log(balance);
 ```
 
 ## Utility Functions
@@ -118,7 +168,7 @@ wasm-pack test --headless --chrome crates/bolt402-wasm
 
 ## Architecture
 
-bolt402-wasm provides an **in-process** mock environment — no HTTP server, no WebSocket, no real Lightning node. The mock server and client communicate directly in memory, simulating the full L402 protocol:
+bolt402-wasm provides the real Rust L402 client and backend adapters over `wasm-bindgen`:
 
 ```
 ┌─────────────────────────────────┐
@@ -129,20 +179,19 @@ bolt402-wasm provides an **in-process** mock environment — no HTTP server, no 
 ┌─────────────▼───────────────────┐
 │         bolt402-wasm            │
 │                                 │
-│  WasmMockServer  WasmMockClient │
-│      │                │         │
-│      │   in-process   │         │
-│      ├────────────────┤         │
-│      │  L402 protocol │         │
-│      │  challenge →   │         │
-│      │  ← payment     │         │
-│      │  → retry       │         │
-│      │  ← 200 OK      │         │
-│      └────────────────┘         │
-│                                 │
-│  Budget tracker, token cache,   │
-│  receipt logger                 │
+│  WasmL402Client                 │
+│  WasmLndRestBackend             │
+│  WasmClnRestBackend             │
+│  WasmSwissKnifeBackend          │
 └─────────────────────────────────┘
+              │
+   ┌──────────┼───────────┐
+   ▼          ▼           ▼
+ bolt402-  bolt402-   bolt402-
+  core       lnd         cln
+              │           │
+              ▼           ▼
+        LND REST API   CLN REST API
 ```
 
 ## License

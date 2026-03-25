@@ -78,7 +78,7 @@ When a request is made, the budget tracker checks for a domain-specific budget f
 ## Using Budgets with L402Client
 
 ```rust
-use bolt402_core::{L402Client, L402ClientConfig};
+use bolt402_core::L402Client;
 use bolt402_core::budget::Budget;
 use bolt402_core::cache::InMemoryTokenStore;
 
@@ -106,20 +106,19 @@ match client.get("https://expensive-api.com/data").await {
 ## Using Budgets with Vercel AI SDK
 
 ```typescript
-import { createBolt402Tools, LndBackend } from 'bolt402-ai-sdk';
+import { createBolt402Tools } from 'bolt402-ai-sdk';
+import init, { WasmBudgetConfig, WasmL402Client } from 'bolt402-wasm';
 
-const tools = createBolt402Tools({
-  backend: new LndBackend({
-    url: 'https://localhost:8080',
-    macaroon: process.env.LND_MACAROON!,
-  }),
-  budget: {
-    perRequestMax: 1_000,    // Max 1,000 sats per request
-    hourlyMax: 10_000,       // Max 10k sats per hour
-    dailyMax: 100_000,       // Max 100k sats per day
-    totalMax: 1_000_000,     // Max 1M sats total
-  },
-});
+await init();
+
+const client = WasmL402Client.withLndRest(
+  'https://localhost:8080',
+  process.env.LND_MACAROON!,
+  new WasmBudgetConfig(1_000, 10_000, 100_000, 1_000_000),
+  100,
+);
+
+const tools = createBolt402Tools({ client });
 ```
 
 The AI agent will receive a clear error message if it tries to exceed the budget, and can report this to the user.

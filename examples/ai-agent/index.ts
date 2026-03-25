@@ -9,28 +9,27 @@
 
 import { generateText, stepCountIs } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { createBolt402Tools, LndBackend } from 'bolt402-ai-sdk';
+import { createBolt402Tools } from 'bolt402-ai-sdk';
+import init, { WasmBudgetConfig, WasmL402Client } from 'bolt402-wasm';
 
 async function main() {
   console.log('bolt402 AI Agent Example');
   console.log('========================\n');
 
-  // Step 1: Configure the Lightning backend
-  const backend = new LndBackend({
-    url: process.env.LND_URL ?? 'https://localhost:8080',
-    macaroon: process.env.LND_MACAROON ?? '',
-  });
+  await init();
 
-  // Step 2: Create tools with budget limits
-  const tools = createBolt402Tools({
-    backend,
-    budget: {
-      perRequestMax: 1_000,  // Max 1,000 sats per request
-      dailyMax: 10_000,      // Max 10,000 sats per day
-    },
-  });
+  // Step 1: Configure the Lightning client
+  const client = WasmL402Client.withLndRest(
+    process.env.LND_URL ?? 'https://localhost:8080',
+    process.env.LND_MACAROON ?? '',
+    new WasmBudgetConfig(1_000, 0, 10_000, 0),
+    100,
+  );
 
-  console.log('Lightning backend configured');
+  // Step 2: Create tools with the configured client
+  const tools = createBolt402Tools({ client });
+
+  console.log('Lightning client configured');
   console.log('Budget: max 1,000 sats/request, 10,000 sats/day\n');
 
   // Step 3: Run the agent

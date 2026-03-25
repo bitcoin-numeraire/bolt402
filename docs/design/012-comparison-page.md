@@ -80,8 +80,14 @@ cost=$(echo "$result" | jq -r '.payment.amount_sat')
 
 **bolt402 (Rust):**
 ```rust
+let backend = LndGrpcBackend::connect(
+    "https://localhost:10009",
+    "/path/to/tls.cert",
+    "/path/to/admin.macaroon",
+).await?;
+
 let client = L402Client::builder()
-    .ln_backend(LndBackend::new(&config))
+    .ln_backend(backend)
     .budget(Budget::per_request(1000))
     .build()?;
 
@@ -91,9 +97,17 @@ let weather: Weather = response.json().await?;
 
 **bolt402 (TypeScript — Vercel AI SDK):**
 ```typescript
+await init();
+
+const client = WasmL402Client.withLndRest(
+  url,
+  macaroon,
+  new WasmBudgetConfig(1000, 0, 0, 0),
+  100,
+);
+
 const tools = createBolt402Tools({
-  backend: new LndBackend({ url, macaroon }),
-  budget: { perRequestMax: 1000 },
+  client,
 });
 
 const { text } = await generateText({

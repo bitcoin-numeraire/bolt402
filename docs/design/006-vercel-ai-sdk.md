@@ -1,8 +1,10 @@
 # Design Doc 006: Vercel AI SDK Integration
 
-**Status:** In Progress
+**Status:** Superseded by `docs/design/045-wasm-bindings.md`
 **Issue:** #8
 **Author:** Toshi
+
+> Historical note: this document captures the original pure-TypeScript proposal. The implemented package no longer ships a native TS `L402Client` or pluggable TS backends. Today `bolt402-ai-sdk` is a thin wrapper around `bolt402-wasm`, and the current public entry point is `createBolt402Tools({ client })` with a `WasmL402Client`.
 
 ## Problem
 
@@ -115,128 +117,58 @@ interface NodeInfo {
 }
 ```
 
-### L402Client
+### Implemented Surface
 
-```typescript
-const client = new L402Client({
-  backend: new LndBackend({ url: 'https://localhost:8080', macaroon: '...' }),
-  tokenStore: new InMemoryTokenStore(),
-  budget: { perRequestMax: 1000, dailyMax: 10000 },
-  maxFeeSats: 100,
-});
-
-// Core methods
-const response = await client.fetch('https://api.example.com/resource');
-const response = await client.get('https://api.example.com/resource');
-const response = await client.post('https://api.example.com/resource', { body: '...' });
-```
-
-The L402 flow mirrors the Rust implementation exactly:
-1. Check token cache for endpoint
-2. If cached token exists, try it. If rejected (402), remove and continue.
-3. Make request without auth
-4. If not 402, return as-is
-5. Parse `WWW-Authenticate: L402` header
-6. Check budget
-7. Pay invoice via LnBackend
-8. Cache token
-9. Retry with `Authorization: L402 <macaroon>:<preimage>` header
-10. Record receipt
-
-### Vercel AI SDK Tools
+The final package is thinner than this original proposal. `bolt402-ai-sdk` does not ship its own TypeScript `L402Client` anymore; it wraps a `WasmL402Client` from `bolt402-wasm`:
 
 ```typescript
 import { createBolt402Tools } from 'bolt402-ai-sdk';
+import init, { WasmBudgetConfig, WasmL402Client } from 'bolt402-wasm';
 
-const tools = createBolt402Tools({
-  backend: new LndBackend({ ... }),
-  budget: { perRequestMax: 1000 },
-});
+await init();
 
-// Use with Vercel AI SDK
-const result = await generateText({
-  model: openai('gpt-4o'),
-  tools,
-  prompt: 'Fetch the weather data from this L402-gated API: https://api.example.com/weather',
-});
+const client = WasmL402Client.withLndRest(
+  'https://localhost:8080',
+  'hex-encoded-admin-macaroon',
+  new WasmBudgetConfig(1000, 0, 10000, 0),
+  100,
+);
+
+const tools = createBolt402Tools({ client });
 ```
 
-The function returns an object with these tools:
+The runtime L402 flow is still the same:
+1. Check token cache for the endpoint
+2. Make the unauthenticated request
+3. Parse any `WWW-Authenticate: L402` challenge
+4. Enforce budgets before payment
+5. Pay the invoice through the configured backend
+6. Cache the token and retry with `Authorization: L402`
+7. Record the receipt
+
+### Vercel AI SDK Tools
+
+The implemented package returns two tools:
 
 #### `l402_fetch`
 Fetch any URL, automatically handling L402 payment challenges.
 
-```typescript
-{
-  description: 'Fetch a URL, automatically paying Lightning invoices for L402-gated APIs. Returns the response body and payment receipt if a payment was made.',
-  inputSchema: z.object({
-    url: z.string().url().describe('The URL to fetch'),
-    method: z.enum(['GET', 'POST', 'PUT', 'DELETE']).default('GET').describe('HTTP method'),
-    body: z.string().optional().describe('Request body (for POST/PUT)'),
-    headers: z.record(z.string()).optional().describe('Additional headers'),
-  }),
-  execute: async ({ url, method, body, headers }) => { ... }
-}
-```
-
-#### `l402_get_balance`
-Check the Lightning node balance.
-
-```typescript
-{
-  description: 'Get the current Lightning node balance in satoshis.',
-  inputSchema: z.object({}),
-  execute: async () => { ... }
-}
-```
-
 #### `l402_get_receipts`
-Get payment receipts for auditing.
+Return accumulated payment receipts for auditing and cost reporting.
 
-```typescript
-{
-  description: 'Get all L402 payment receipts from this session. Useful for tracking costs.',
-  inputSchema: z.object({}),
-  execute: async () => { ... }
-}
-```
+No dedicated `l402_get_balance` tool shipped in the final implementation.
 
-### Lightning Backends
+### Backend Selection
 
-#### LND REST
+`bolt402-ai-sdk` no longer exposes native TypeScript backend classes. Backend selection now happens in `bolt402-wasm`:
 
-```typescript
-const backend = new LndBackend({
-  url: 'https://localhost:8080',
-  macaroon: 'hex-encoded-admin-macaroon',
-  // OR
-  macaroonPath: '/path/to/admin.macaroon',
-  tlsCertPath: '/path/to/tls.cert', // optional, for self-signed certs
-});
-```
-
-Uses LND's REST API:
-- `POST /v2/router/send` for payments (v2 sync send)
-- `GET /v1/balance/channels` for balance
-- `GET /v1/getinfo` for node info
-
-#### SwissKnife REST
-
-```typescript
-const backend = new SwissKnifeBackend({
-  url: 'https://app.numeraire.tech',
-  apiKey: 'sk-...',
-});
-```
-
-Uses SwissKnife's API:
-- `POST /api/payments/bolt11` for paying invoices
-- `GET /api/balance` for balance
-- `GET /api/info` for node info
+- `WasmL402Client.withLndRest(...)`
+- `WasmL402Client.withSwissKnife(...)`
+- `WasmClnRestBackend` for direct CLN REST access from JS/TS when you need the backend wrapper itself
 
 ## Key Decisions
 
-1. **Native TypeScript, not WASM.** The L402 protocol is simple enough that a native TS implementation is cleaner than WASM bindings. WASM can come later for users who want a single source of truth. The TS client mirrors the Rust core's API and behavior exactly.
+1. **WASM-first, Rust as the single source of truth.** The implemented package keeps the protocol engine, budget logic, token cache, and receipts in Rust and exposes them through `wasm-bindgen`.
 
 2. **`packages/` directory in the repo root.** Separates TypeScript packages from the Rust workspace. The Rust crates stay in `crates/`, TypeScript packages go in `packages/`. Clean separation.
 
@@ -244,15 +176,15 @@ Uses SwissKnife's API:
 
 4. **Vitest for testing.** Fast, TypeScript-native, good Vercel AI SDK ecosystem support.
 
-5. **`fetch` API, not Axios.** Uses the standard `fetch` API (available in Node 18+). No unnecessary dependencies. Compatible with edge runtimes.
+5. **Browser-compatible networking via Rust backends.** The shipped backends use `reqwest`, which compiles to browser `fetch` on WASM targets.
 
 6. **Budget tracking is optional.** Defaults to unlimited if not configured, matching the Rust core behavior.
 
-7. **`needsApproval` option.** The `l402_fetch` tool supports the Vercel AI SDK's `needsApproval` feature for high-value payments (configurable threshold).
+7. **Small tool surface.** The final package keeps the AI SDK surface to `l402_fetch` and `l402_get_receipts`; approval logic can be layered at the application level.
 
 ## Alternatives Considered
 
-- **WASM-first approach:** Would ensure Rust and TS implementations are identical, but adds build complexity and limits edge runtime compatibility. The L402 protocol is simple; a native TS port is more practical for the first release.
+- **Native TypeScript client:** Rejected in the final implementation in favor of a single Rust/WASM implementation shared with the rest of the SDK.
 - **MCP server instead of Vercel AI SDK tools:** MCP is framework-agnostic but doesn't integrate as tightly with the Vercel AI SDK's tool calling, type inference, and streaming. The Vercel AI SDK is the target framework per the issue.
 - **Single mega-tool:** Instead of 3 tools, use a single tool with a discriminated `action` field. Rejected because separate tools give the LLM clearer affordances and better type inference.
 

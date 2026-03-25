@@ -30,7 +30,7 @@ pub trait LnBackend: Send + Sync {
 
 The three methods serve different purposes:
 - `pay_invoice` is the core: it pays a BOLT11 invoice and returns proof of payment
-- `get_balance` lets the client (or the `l402_get_balance` AI tool) check available funds
+- `get_balance` lets the client or surrounding application check available funds
 - `get_info` provides node metadata (used for diagnostics and the AI SDK balance tool)
 
 ## Example: Core Lightning (CLN) Backend
@@ -205,7 +205,7 @@ impl LnBackend for ClnBackend {
 ### Step 4: Use Your Backend
 
 ```rust
-use bolt402_core::{L402Client, L402ClientConfig};
+use bolt402_core::L402Client;
 use bolt402_core::budget::Budget;
 use bolt402_core::cache::InMemoryTokenStore;
 
@@ -253,46 +253,15 @@ async fn test_cln_client_integration() {
 }
 ```
 
-## TypeScript Backend
+## TypeScript / WASM Note
 
-The same pattern applies in the TypeScript `bolt402-ai-sdk` package:
+`bolt402-ai-sdk` no longer exposes a native TypeScript `LnBackend` interface. The package is a thin wrapper around `bolt402-wasm`, which in turn wraps Rust backends and the Rust `L402Client`.
 
-```typescript
-import type { LnBackend, PaymentResult, NodeInfo } from 'bolt402-ai-sdk';
+If you need a new backend in JavaScript or TypeScript:
 
-class MyCustomBackend implements LnBackend {
-  async payInvoice(bolt11: string, maxFeeSats: number): Promise<PaymentResult> {
-    // Your payment logic here
-    const response = await fetch('https://my-node/pay', {
-      method: 'POST',
-      body: JSON.stringify({ invoice: bolt11, max_fee: maxFeeSats }),
-    });
-    const data = await response.json();
-
-    return {
-      preimage: data.preimage,
-      paymentHash: data.payment_hash,
-      amountSats: data.amount_sats,
-      feeSats: data.fee_sats,
-    };
-  }
-
-  async getBalance(): Promise<number> {
-    const res = await fetch('https://my-node/balance');
-    return (await res.json()).balance_sats;
-  }
-
-  async getInfo(): Promise<NodeInfo> {
-    const res = await fetch('https://my-node/info');
-    const info = await res.json();
-    return {
-      pubkey: info.pubkey,
-      alias: info.alias,
-      numActiveChannels: info.num_active_channels,
-    };
-  }
-}
-```
+- implement the adapter in Rust by adding a new crate (or extending an existing backend crate) that implements `LnBackend`
+- expose it through `crates/bolt402-wasm` with a wasm-bindgen wrapper, following `WasmLndRestBackend`, `WasmClnRestBackend`, or `WasmSwissKnifeBackend`
+- add a `WasmL402Client` constructor if the backend should support the full end-to-end L402 flow from JS/TS
 
 ## Checklist for New Backends
 
@@ -302,4 +271,5 @@ class MyCustomBackend implements LnBackend {
 - [ ] Return accurate `fee_sats` (not zero) for proper receipt tracking
 - [ ] Add unit tests with mocked HTTP responses
 - [ ] Add integration tests using `bolt402-mock` for the L402Client flow
+- [ ] Add a WASM wrapper in `crates/bolt402-wasm` if the backend should be available from JS/TS
 - [ ] Document connection parameters and authentication requirements
