@@ -8,7 +8,7 @@ use std::sync::Once;
 
 use bolt402_core::budget::Budget;
 use bolt402_core::cache::InMemoryTokenStore;
-use bolt402_core::{L402Client, L402ClientConfig};
+use bolt402_core::L402Client;
 use bolt402_lnd::LndGrpcBackend;
 use bolt402_lnd::LndRestBackend;
 use bolt402_proto::LnBackend;
@@ -116,7 +116,7 @@ pub fn lnd_rest_backend() -> LndRestBackend {
 ///
 /// Returns `None` if CLN credentials are not available (CLN gRPC certs
 /// are generated at runtime and may not exist).
-pub async fn cln_backend() -> Option<bolt402_cln::ClnBackend> {
+pub async fn cln_backend() -> Option<bolt402_cln::ClnGrpcBackend> {
     let host =
         std::env::var("CLN_GRPC_HOST").unwrap_or_else(|_| "https://localhost:9736".to_string());
 
@@ -139,7 +139,7 @@ pub async fn cln_backend() -> Option<bolt402_cln::ClnBackend> {
     std::fs::write(&cert_path, base64_decode(&client_cert_b64)).ok()?;
     std::fs::write(&key_path, base64_decode(&client_key_b64)).ok()?;
 
-    match bolt402_cln::ClnBackend::connect(
+    match bolt402_cln::ClnGrpcBackend::connect(
         &host,
         ca_path.to_str().unwrap(),
         cert_path.to_str().unwrap(),
