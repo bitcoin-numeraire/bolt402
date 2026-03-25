@@ -1,0 +1,121 @@
+services:
+  bitcoind:
+    image: lncm/bitcoind:v27.1
+    restart: unless-stopped
+    command:
+      - -regtest
+      - -server
+      - -rpcuser=regtest
+      - -rpcpassword=regtest
+      - -rpcallowip=0.0.0.0/0
+      - -rpcbind=0.0.0.0
+      - -zmqpubrawblock=tcp://0.0.0.0:28332
+      - -zmqpubrawtx=tcp://0.0.0.0:28333
+      - -fallbackfee=0.00001
+      - -txindex=1
+    ports:
+      - "18443:18443"
+    volumes:
+      - bitcoind-data:/root/.bitcoin
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=regtest", "-rpcpassword=regtest", "getblockchaininfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # LND Alice: PAYER node. bolt402 client connects here (gRPC + REST).
+  lnd-alice:
+    image: lightninglabs/lnd:v0.18.5-beta
+    restart: unless-stopped
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    volumes:
+      - lnd-alice-data:/root/.lnd
+      - ./lnd/alice.conf:/root/.lnd/lnd.conf:ro
+    ports:
+      - "10009:10009"  # gRPC
+      - "8080:8080"    # REST
+    healthcheck:
+      test: ["CMD", "lncli", "--network=regtest", "getinfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # LND Bob: RECEIVER node. Aperture uses this to create invoices.
+  lnd-bob:
+    image: lightninglabs/lnd:v0.18.5-beta
+    restart: unless-stopped
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    volumes:
+      - lnd-bob-data:/root/.lnd
+      - ./lnd/bob.conf:/root/.lnd/lnd.conf:ro
+    ports:
+      - "10010:10009"  # gRPC (different host port)
+      - "8082:8080"    # REST (different host port)
+    healthcheck:
+      test: ["CMD", "lncli", "--network=regtest", "getinfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # CLN: PAYER node. For bolt402-cln backend tests.
+  cln:
+    image: elementsproject/lightningd:v24.11.1
+    restart: unless-stopped
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    volumes:
+      - cln-data:/root/.lightning
+      - ./cln/config:/root/.lightning/regtest/config:ro
+    ports:
+      - "9736:9736"    # gRPC
+    healthcheck:
+      test: ["CMD", "lightning-cli", "--network=regtest", "getinfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Simple backend HTTP server that Aperture proxies to.
+  backend:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    command: ["node", "server.js"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Aperture: Lightning Labs' reference L402 reverse proxy.
+  # Sits in front of the backend server, requires Lightning payments via lnd-bob.
+  aperture:
+    image: lightninglabs/aperture:v0.4.2
+    restart: unless-stopped
+    depends_on:
+      lnd-bob:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./aperture/aperture.yaml:/root/.aperture/aperture.yaml:ro
+      - lnd-bob-data:/lnd:ro
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
+
+volumes:
+  bitcoind-data:
+  lnd-alice-data:
+  lnd-bob-data:
+  cln-data:
