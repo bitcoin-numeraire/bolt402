@@ -40,7 +40,10 @@ async fn per_request_budget_blocks_expensive() {
     // 100-sat endpoint should exceed per-request limit
     let url = format!("{}/api/data", l402_server_url());
     let result = client.get(&url).await;
-    assert!(result.is_err(), "should reject payment exceeding per-request budget");
+    assert!(
+        result.is_err(),
+        "should reject payment exceeding per-request budget"
+    );
 
     let err = result.unwrap_err();
     let err_str = format!("{err}");
@@ -71,10 +74,7 @@ async fn total_budget_enforced_across_requests() {
     // Note: the token for /api/data is cached, so we need a different endpoint
     let url2 = format!("{}/api/premium", l402_server_url());
     let result = client.get(&url2).await;
-    assert!(
-        result.is_err(),
-        "second payment should exceed total budget"
-    );
+    assert!(result.is_err(), "second payment should exceed total budget");
 }
 
 #[tokio::test]

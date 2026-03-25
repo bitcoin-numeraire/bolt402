@@ -26,7 +26,10 @@ async fn cached_token_skips_payment() {
     let resp2 = client.get(&url).await.unwrap();
     assert_eq!(resp2.status().as_u16(), 200);
     assert!(!resp2.paid(), "second request should NOT pay");
-    assert!(resp2.cached_token(), "second request should use cached token");
+    assert!(
+        resp2.cached_token(),
+        "second request should use cached token"
+    );
     assert!(
         resp2.receipt().is_none(),
         "cached request should have no receipt"
@@ -49,7 +52,10 @@ async fn different_endpoints_not_cached() {
     // Request /api/data — different endpoint, must pay again
     let url2 = format!("{}/api/data", l402_server_url());
     let resp2 = client.get(&url2).await.unwrap();
-    assert!(resp2.paid(), "different endpoint should require separate payment");
+    assert!(
+        resp2.paid(),
+        "different endpoint should require separate payment"
+    );
     assert!(!resp2.cached_token());
 }
 
@@ -76,7 +82,10 @@ async fn total_spent_tracks_real_payments() {
     let _ = resp2.text().await.unwrap();
 
     let total_after_second = client.total_spent().await;
-    assert_eq!(total_after_second, 10, "cached request should not increase total spent");
+    assert_eq!(
+        total_after_second, 10,
+        "cached request should not increase total spent"
+    );
 }
 
 #[tokio::test]

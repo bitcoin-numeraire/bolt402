@@ -30,9 +30,14 @@ async fn full_l402_flow_cln() {
     let info = bolt402_proto::LnBackend::get_info(&backend).await.unwrap();
     tracing::info!("Connected to CLN: {} ({})", info.alias, info.pubkey);
     assert!(!info.pubkey.is_empty());
-    assert!(info.num_active_channels > 0, "CLN must have active channels");
+    assert!(
+        info.num_active_channels > 0,
+        "CLN must have active channels"
+    );
 
-    let balance = bolt402_proto::LnBackend::get_balance(&backend).await.unwrap();
+    let balance = bolt402_proto::LnBackend::get_balance(&backend)
+        .await
+        .unwrap();
     tracing::info!("CLN balance: {} sats", balance);
     assert!(balance > 1000, "CLN must have funds to pay invoices");
 

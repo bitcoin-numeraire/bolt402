@@ -16,10 +16,15 @@ async fn full_l402_flow_grpc() {
     let info = bolt402_proto::LnBackend::get_info(&backend).await.unwrap();
     tracing::info!("Connected to LND: {} ({})", info.alias, info.pubkey);
     assert!(!info.pubkey.is_empty());
-    assert!(info.num_active_channels > 0, "LND must have active channels");
+    assert!(
+        info.num_active_channels > 0,
+        "LND must have active channels"
+    );
 
     // Check balance
-    let balance = bolt402_proto::LnBackend::get_balance(&backend).await.unwrap();
+    let balance = bolt402_proto::LnBackend::get_balance(&backend)
+        .await
+        .unwrap();
     tracing::info!("LND balance: {} sats", balance);
     assert!(balance > 1000, "LND must have funds to pay invoices");
 
@@ -39,7 +44,9 @@ async fn full_l402_flow_grpc() {
     );
 
     // Verify receipt
-    let receipt = response.receipt().expect("paid request must have a receipt");
+    let receipt = response
+        .receipt()
+        .expect("paid request must have a receipt");
     assert_eq!(receipt.amount_sats, 100, "endpoint price is 100 sats");
     assert_eq!(receipt.response_status, 200);
     assert!(!receipt.payment_hash.is_empty());

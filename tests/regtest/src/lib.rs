@@ -51,9 +51,7 @@ pub fn load_env() {
 /// Get a required environment variable or panic with a helpful message.
 pub fn env_required(key: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| {
-        panic!(
-            "Missing required env var: {key}. Run init-regtest.sh first or set it manually."
-        )
+        panic!("Missing required env var: {key}. Run init-regtest.sh first or set it manually.")
     })
 }
 
