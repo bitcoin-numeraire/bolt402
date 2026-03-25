@@ -1,4 +1,4 @@
-//! WASM-bindgen wrapper for the Rust [`L402Client`] from `bolt402-core`.
+//! WASM-bindgen wrapper for the Rust [`bolt402_core::L402Client`] from `bolt402-core`.
 //!
 //! Exposes the full L402 protocol engine to JavaScript/TypeScript via
 //! `wasm-bindgen`. The client handles HTTP 402 challenges, Lightning
@@ -16,7 +16,72 @@ use bolt402_core::{L402Client, L402ClientConfig};
 use bolt402_lnd::LndRestBackend;
 use bolt402_swissknife::SwissKnifeBackend;
 
-use crate::WasmReceipt;
+// ---------------------------------------------------------------------------
+// WasmReceipt
+// ---------------------------------------------------------------------------
+
+/// A payment receipt from an L402 transaction.
+///
+/// Contains proof-of-payment data for audit and cost tracking.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct WasmReceipt {
+    /// Unix timestamp (seconds) of the payment.
+    #[wasm_bindgen(readonly, js_name = "timestamp")]
+    pub timestamp: u64,
+
+    /// Amount paid in satoshis (excluding routing fees).
+    #[wasm_bindgen(readonly, js_name = "amountSats")]
+    pub amount_sats: u64,
+
+    /// Routing fee in satoshis.
+    #[wasm_bindgen(readonly, js_name = "feeSats")]
+    pub fee_sats: u64,
+
+    /// HTTP status code of the final response.
+    #[wasm_bindgen(readonly, js_name = "responseStatus")]
+    pub response_status: u16,
+
+    /// Total latency from initial request to final response (milliseconds).
+    #[wasm_bindgen(readonly, js_name = "latencyMs")]
+    pub latency_ms: u64,
+
+    /// Endpoint path that was accessed.
+    endpoint: String,
+
+    /// Hex-encoded payment hash.
+    payment_hash: String,
+
+    /// Hex-encoded preimage (proof of payment).
+    preimage: String,
+}
+
+#[wasm_bindgen]
+impl WasmReceipt {
+    /// The endpoint path that was accessed.
+    #[wasm_bindgen(getter)]
+    pub fn endpoint(&self) -> String {
+        self.endpoint.clone()
+    }
+
+    /// Hex-encoded payment hash.
+    #[wasm_bindgen(getter, js_name = "paymentHash")]
+    pub fn payment_hash(&self) -> String {
+        self.payment_hash.clone()
+    }
+
+    /// Hex-encoded preimage (proof of payment).
+    #[wasm_bindgen(getter)]
+    pub fn preimage(&self) -> String {
+        self.preimage.clone()
+    }
+
+    /// Total cost (amount + fee) in satoshis.
+    #[wasm_bindgen(js_name = "totalCostSats")]
+    pub fn total_cost_sats(&self) -> u64 {
+        self.amount_sats + self.fee_sats
+    }
+}
 
 // ---------------------------------------------------------------------------
 // WasmBudgetConfig

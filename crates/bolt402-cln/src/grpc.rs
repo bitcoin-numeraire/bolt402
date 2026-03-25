@@ -1,4 +1,4 @@
-//! CLN backend implementation using vendored gRPC protos.
+//! CLN gRPC backend implementation using vendored protos.
 //!
 //! Connects to a Core Lightning node via gRPC with mutual TLS (mTLS)
 //! authentication. Uses the `Pay` RPC for invoice payments, `ListFunds`
@@ -7,10 +7,10 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use bolt402_cln::ClnBackend;
+//! use bolt402_cln::ClnGrpcBackend;
 //!
 //! # async fn example() {
-//! let backend = ClnBackend::connect(
+//! let backend = ClnGrpcBackend::connect(
 //!     "https://localhost:9736",
 //!     "/path/to/ca.pem",
 //!     "/path/to/client.pem",
@@ -23,8 +23,8 @@
 use std::fmt;
 
 use async_trait::async_trait;
-use bolt402_core::ClientError;
-use bolt402_core::port::{LnBackend, NodeInfo, PaymentResult};
+use bolt402_proto::ClientError;
+use bolt402_proto::{LnBackend, NodeInfo, PaymentResult};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use tracing::debug;
 
@@ -50,41 +50,35 @@ use crate::error::ClnError;
 /// # Example
 ///
 /// ```rust,no_run
-/// use bolt402_cln::ClnBackend;
-/// use bolt402_core::{L402Client, L402ClientConfig};
-/// use bolt402_core::budget::Budget;
-/// use bolt402_core::cache::InMemoryTokenStore;
+/// use bolt402_cln::ClnGrpcBackend;
+/// use bolt402_proto::LnBackend;
 ///
 /// # async fn example() {
-/// let backend = ClnBackend::connect(
+/// let backend = ClnGrpcBackend::connect(
 ///     "https://localhost:9736",
 ///     "/path/to/ca.pem",
 ///     "/path/to/client.pem",
 ///     "/path/to/client-key.pem",
 /// ).await.unwrap();
 ///
-/// let client = L402Client::builder()
-///     .ln_backend(backend)
-///     .token_store(InMemoryTokenStore::default())
-///     .budget(Budget::unlimited())
-///     .build()
-///     .unwrap();
+/// let info = backend.get_info().await.unwrap();
+/// println!("Connected to: {} ({})", info.alias, info.pubkey);
 /// # }
 /// ```
-pub struct ClnBackend {
+pub struct ClnGrpcBackend {
     client: NodeClient<Channel>,
     address: String,
 }
 
-impl fmt::Debug for ClnBackend {
+impl fmt::Debug for ClnGrpcBackend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ClnBackend")
+        f.debug_struct("ClnGrpcBackend")
             .field("address", &self.address)
             .finish_non_exhaustive()
     }
 }
 
-impl ClnBackend {
+impl ClnGrpcBackend {
     /// Connect to a CLN node using mTLS authentication.
     ///
     /// # Arguments
@@ -156,7 +150,7 @@ impl ClnBackend {
 }
 
 #[async_trait]
-impl LnBackend for ClnBackend {
+impl LnBackend for ClnGrpcBackend {
     async fn pay_invoice(
         &self,
         bolt11: &str,
@@ -299,7 +293,7 @@ mod tests {
     #[test]
     fn debug_format() {
         // Verify debug output includes address but not sensitive data.
-        let display = "ClnBackend { address: \"https://localhost:9736\", .. }".to_string();
+        let display = "ClnGrpcBackend { address: \"https://localhost:9736\", .. }".to_string();
         assert!(display.contains("localhost:9736"));
     }
 }
