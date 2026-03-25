@@ -1,6 +1,6 @@
 services:
   bitcoind:
-    image: bitcoin/bitcoin:28.4
+    image: bitcoin/bitcoin:30.2
     restart: unless-stopped
     command:
       - -regtest
