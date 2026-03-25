@@ -123,8 +123,33 @@ services:
       retries: 30
       start_period: 15s
 
+  # SwissKnife: Numeraire's custodial Lightning wallet.
+  # Connected to lnd-bob via LND REST as the Lightning provider.
+  # Provides REST API for bolt402-swissknife backend tests.
+  swissknife:
+    image: bitcoinnumeraire/swissknife-server:0.1.7
+    restart: unless-stopped
+    depends_on:
+      lnd-bob:
+        condition: service_healthy
+    environment:
+      RUN_MODE: production
+    volumes:
+      - ./swissknife/regtest.toml:/config/production.toml:ro
+      - lnd-bob-data:/lnd:ro
+      - swissknife-data:/storage
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/v1/health 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
 volumes:
   bitcoind-data:
   lnd-alice-data:
   lnd-bob-data:
   cln-data:
+  swissknife-data:
