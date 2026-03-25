@@ -218,14 +218,17 @@ log "=== Step 6: Setting up SwissKnife ==="
 # Export CLN rune to .env so docker-compose can pass it to swissknife
 echo "CLN_RUNE=${CLN_REST_RUNE}" > "${PROJECT_DIR}/.env"
 
-# Restart swissknife now that the rune is available
-docker compose -f "$COMPOSE_FILE" up -d swissknife 2>/dev/null
+# Force-recreate swissknife so it picks up the new .env with CLN_RUNE
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate swissknife
+log "SwissKnife container (re)started with CLN rune."
 
 # Wait for SwissKnife to be ready
 SWISSKNIFE_READY=false
-for i in $(seq 1 30); do
-  if wget -q -O /dev/null http://localhost:3000/v1/health 2>/dev/null; then
+for i in $(seq 1 60); do
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/v1/health 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" != "000" ] && [ "$HTTP_CODE" != "502" ] && [ "$HTTP_CODE" != "503" ]; then
     SWISSKNIFE_READY=true
+    log "SwissKnife ready (HTTP $HTTP_CODE after ${i}s)."
     break
   fi
   sleep 2
