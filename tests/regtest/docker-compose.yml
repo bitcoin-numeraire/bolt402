@@ -103,7 +103,7 @@ services:
   # build from source: docker build --build-arg checkout=v0.4.2 -t aperture:local
   # using the Dockerfile at https://github.com/lightninglabs/aperture
   aperture:
-    image: lightninglabs/aperture:v0.4.2
+    image: aperture:local
     restart: unless-stopped
     depends_on:
       lnd-bob:
@@ -142,7 +142,7 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/v1/health || wget -q -O- http://127.0.0.1:3000/v1/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/v1/system/health || wget -q -O- http://127.0.0.1:3000/v1/system/health || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 30

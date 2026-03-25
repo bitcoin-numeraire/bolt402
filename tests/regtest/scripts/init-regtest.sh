@@ -224,9 +224,8 @@ log "SwissKnife container (re)started with CLN rune."
 
 # Wait for SwissKnife to be ready
 SWISSKNIFE_READY=false
-for i in $(seq 1 60); do
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/v1/health 2>/dev/null || echo "000")
-  if [ "$HTTP_CODE" != "000" ] && [ "$HTTP_CODE" != "502" ] && [ "$HTTP_CODE" != "503" ]; then
+for i in $(seq 1 30); do
+  if curl -sf -o /dev/null http://localhost:3000/v1/system/health 2>/dev/null; then
     SWISSKNIFE_READY=true
     log "SwissKnife ready (HTTP $HTTP_CODE after ${i}s)."
     break
@@ -241,8 +240,9 @@ if [ "$SWISSKNIFE_READY" = true ]; then
   log "SwissKnife is ready."
 
   # 1. Sign up to get a JWT token
-  SIGNUP_RESP=$(wget -q -O- --post-data='{"username":"bolt402test","password":"bolt402testpass"}' \
-    --header="Content-Type: application/json" \
+  SIGNUP_RESP=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"username":"bolt402test","password":"bolt402testpass"}' \
     "$SWISSKNIFE_API_URL/v1/auth/sign-up" 2>/dev/null || echo "")
 
   JWT_TOKEN=""
@@ -252,8 +252,9 @@ if [ "$SWISSKNIFE_READY" = true ]; then
 
   # If sign-up fails (user exists), try sign-in
   if [ -z "$JWT_TOKEN" ]; then
-    SIGNIN_RESP=$(wget -q -O- --post-data='{"username":"bolt402test","password":"bolt402testpass"}' \
-      --header="Content-Type: application/json" \
+    SIGNIN_RESP=$(curl -s -X POST \
+      -H "Content-Type: application/json" \
+      -d '{"username":"bolt402test","password":"bolt402testpass"}' \
       "$SWISSKNIFE_API_URL/v1/auth/sign-in" 2>/dev/null || echo "")
     if [ -n "$SIGNIN_RESP" ]; then
       JWT_TOKEN=$(echo "$SIGNIN_RESP" | jq -r '.token // .access_token // empty' 2>/dev/null)
@@ -264,9 +265,10 @@ if [ "$SWISSKNIFE_READY" = true ]; then
     log "SwissKnife JWT obtained."
 
     # 2. Create an API key
-    APIKEY_RESP=$(wget -q -O- --post-data='{"name":"bolt402-regtest"}' \
-      --header="Content-Type: application/json" \
-      --header="Authorization: Bearer $JWT_TOKEN" \
+    APIKEY_RESP=$(curl -s -X POST \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $JWT_TOKEN" \
+      -d '{"name":"bolt402-regtest","permissions":["read:wallet","write:wallet","read:transaction","write:transaction"]}' \
       "$SWISSKNIFE_API_URL/v1/me/api-keys" 2>/dev/null || echo "")
 
     if [ -n "$APIKEY_RESP" ]; then
@@ -282,6 +284,32 @@ if [ "$SWISSKNIFE_READY" = true ]; then
       # Fallback: use JWT token directly
       SWISSKNIFE_API_KEY="$JWT_TOKEN"
       log "WARNING: Could not create API key, using JWT token instead."
+    fi
+    # 3. Fund SwissKnife wallet via Lightning (Alice → Bob → CLN → SwissKnife)
+    AUTH_HEADER="Api-Key: $SWISSKNIFE_API_KEY"
+    BALANCE_MSAT=$(curl -s -H "$AUTH_HEADER" "$SWISSKNIFE_API_URL/v1/me" 2>/dev/null \
+      | jq -r '.balance.available_msat // 0')
+
+    if [ "${BALANCE_MSAT:-0}" -lt 100000000 ]; then
+      log "Funding SwissKnife wallet (500k sats)..."
+      INVOICE_RESP=$(curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "$AUTH_HEADER" \
+        -d '{"amount_msat":500000000,"description":"regtest funding"}' \
+        "$SWISSKNIFE_API_URL/v1/me/invoices" 2>/dev/null || echo "")
+
+      FUNDING_BOLT11=$(echo "$INVOICE_RESP" | jq -r '.ln_invoice.bolt11 // empty' 2>/dev/null)
+
+      if [ -n "$FUNDING_BOLT11" ]; then
+        log "Paying funding invoice from Alice..."
+        alice payinvoice --force "$FUNDING_BOLT11" > /dev/null 2>&1 && \
+          log "SwissKnife wallet funded." || \
+          log "WARNING: Failed to pay SwissKnife funding invoice."
+      else
+        log "WARNING: Could not create SwissKnife funding invoice."
+      fi
+    else
+      log "SwissKnife wallet already funded (${BALANCE_MSAT} msat)."
     fi
   else
     log "WARNING: SwissKnife auth failed (skipping)."

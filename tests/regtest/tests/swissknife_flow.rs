@@ -28,7 +28,9 @@ async fn full_l402_flow_swissknife() {
     let info = bolt402_proto::LnBackend::get_info(&backend).await.unwrap();
     tracing::info!("Connected to SwissKnife: {}", info.alias);
 
-    let balance = bolt402_proto::LnBackend::get_balance(&backend).await.unwrap();
+    let balance = bolt402_proto::LnBackend::get_balance(&backend)
+        .await
+        .unwrap();
     tracing::info!("SwissKnife balance: {} sats", balance);
 
     let client = build_l402_client(backend);
