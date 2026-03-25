@@ -109,7 +109,7 @@ describe("Regtest: LND REST backend via WASM", () => {
     expect(receipt!.paymentHash).toBeTruthy();
     expect(receipt!.preimage).toBeTruthy();
 
-    const body = JSON.parse(response.body());
+    const body = JSON.parse(response.body);
     expect(body.ok).toBe(true);
     expect(body.resource).toBe("data");
   });
@@ -192,7 +192,7 @@ describe("Regtest: SwissKnife backend via WASM", () => {
     expect(response.status).toBe(200);
     expect(response.paid).toBe(true);
 
-    const body = JSON.parse(response.body());
+    const body = JSON.parse(response.body);
     expect(body.ok).toBe(true);
   });
 });

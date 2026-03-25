@@ -142,7 +142,7 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/v1/health 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/v1/health || wget -q -O- http://127.0.0.1:3000/v1/health || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 30
