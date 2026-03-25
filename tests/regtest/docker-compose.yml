@@ -1,6 +1,6 @@
 services:
   bitcoind:
-    image: lncm/bitcoind:v27.1
+    image: bitcoin/bitcoin:28.4
     restart: unless-stopped
     command:
       - -regtest
@@ -16,7 +16,7 @@ services:
     ports:
       - "18443:18443"
     volumes:
-      - bitcoind-data:/root/.bitcoin
+      - bitcoind-data:/home/bitcoin/.bitcoin
     healthcheck:
       test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=regtest", "-rpcpassword=regtest", "getblockchaininfo"]
       interval: 5s
@@ -25,7 +25,7 @@ services:
 
   # LND Alice: PAYER node. bolt402 client connects here (gRPC + REST).
   lnd-alice:
-    image: lightninglabs/lnd:v0.18.5-beta
+    image: lightninglabs/lnd:v0.20.1-beta
     restart: unless-stopped
     depends_on:
       bitcoind:
@@ -44,7 +44,7 @@ services:
 
   # LND Bob: RECEIVER node. Aperture uses this to create invoices.
   lnd-bob:
-    image: lightninglabs/lnd:v0.18.5-beta
+    image: lightninglabs/lnd:v0.20.1-beta
     restart: unless-stopped
     depends_on:
       bitcoind:
@@ -63,7 +63,7 @@ services:
 
   # CLN: PAYER node. For bolt402-cln backend tests.
   cln:
-    image: elementsproject/lightningd:v24.11.1
+    image: elementsproject/lightningd:v25.12.1
     restart: unless-stopped
     depends_on:
       bitcoind:
@@ -94,6 +94,9 @@ services:
 
   # Aperture: Lightning Labs' reference L402 reverse proxy.
   # Sits in front of the backend server, requires Lightning payments via lnd-bob.
+  # NOTE: Aperture Docker images are amd64-only. For local arm64 development,
+  # build from source: docker build --build-arg checkout=v0.4.2 -t aperture:local
+  # using the Dockerfile at https://github.com/lightninglabs/aperture
   aperture:
     image: lightninglabs/aperture:v0.4.2
     restart: unless-stopped
