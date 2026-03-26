@@ -176,7 +176,7 @@ pub async fn cln_rest_backend() -> Option<bolt402_cln::ClnRestBackend> {
         }
     };
 
-    let backend = match bolt402_cln::ClnRestBackend::with_rune(&host, &rune) {
+    let backend = match bolt402_cln::ClnRestBackend::new(&host, &rune) {
         Ok(backend) => backend,
         Err(e) => {
             tracing::warn!("Failed to create CLN REST backend: {e}");

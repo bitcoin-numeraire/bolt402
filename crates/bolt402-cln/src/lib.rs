@@ -8,9 +8,9 @@
 //!   `tonic` with vendored proto files. Requires mutual TLS (mTLS) with CA
 //!   certificate, client certificate, and client key.
 //!
-//! - **REST** (feature `rest`): Uses the c-lightning-REST plugin API via
-//!   `reqwest`. Simpler to configure, works in WASM/browser environments,
-//!   and supports both macaroon and rune authentication.
+//! - **REST** (feature `rest`): Uses the CLN REST API via `reqwest`. Simpler
+//!   to configure, works in WASM/browser environments, and authenticates
+//!   with rune tokens (CLN's native bearer token system).
 //!
 //! Both features can be enabled simultaneously.
 //!
@@ -35,7 +35,7 @@
 //! # }
 //! ```
 //!
-//! ## REST Example (macaroon)
+//! ## REST Example
 //!
 //! ```rust,no_run
 //! # #[cfg(feature = "rest")]
@@ -44,25 +44,6 @@
 //! use bolt402_proto::LnBackend;
 //!
 //! let backend = ClnRestBackend::new(
-//!     "https://localhost:3001",
-//!     "0201036c6e640258030a...",  // hex-encoded macaroon
-//! )?;
-//!
-//! let info = backend.get_info().await?;
-//! println!("Connected to: {} ({})", info.alias, info.pubkey);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## REST Example (rune)
-//!
-//! ```rust,no_run
-//! # #[cfg(feature = "rest")]
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! use bolt402_cln::ClnRestBackend;
-//! use bolt402_proto::LnBackend;
-//!
-//! let backend = ClnRestBackend::with_rune(
 //!     "https://localhost:3001",
 //!     "rune_token_value...",
 //! )?;

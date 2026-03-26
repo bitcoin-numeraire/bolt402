@@ -76,10 +76,10 @@ describe("WasmSwissKnifeBackend", () => {
 });
 
 describe("WasmClnRestBackend", () => {
-  it("constructs with url and macaroon", () => {
+  it("constructs with url and rune", () => {
     const backend = new WasmClnRestBackend(
       "https://localhost:3001",
-      "deadbeefcafebabe",
+      "rune-token-value",
     );
     expect(backend).toBeDefined();
   });
@@ -95,7 +95,7 @@ describe("WasmClnRestBackend", () => {
   it("exposes payInvoice method", () => {
     const backend = new WasmClnRestBackend(
       "https://localhost:3001",
-      "deadbeefcafebabe",
+      "rune-token-value",
     );
     expect(typeof backend.payInvoice).toBe("function");
   });
@@ -103,7 +103,7 @@ describe("WasmClnRestBackend", () => {
   it("exposes getBalance method", () => {
     const backend = new WasmClnRestBackend(
       "https://localhost:3001",
-      "deadbeefcafebabe",
+      "rune-token-value",
     );
     expect(typeof backend.getBalance).toBe("function");
   });
@@ -111,7 +111,7 @@ describe("WasmClnRestBackend", () => {
   it("exposes getInfo method", () => {
     const backend = new WasmClnRestBackend(
       "https://localhost:3001",
-      "deadbeefcafebabe",
+      "rune-token-value",
     );
     expect(typeof backend.getInfo).toBe("function");
   });

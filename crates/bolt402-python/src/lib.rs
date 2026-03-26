@@ -1,18 +1,26 @@
+#![allow(clippy::doc_markdown)]
+
 //! Python bindings for the bolt402 L402 client SDK.
 //!
 //! Exposes the Rust core to Python via `PyO3`, enabling Python AI agent
 //! frameworks (`LangChain`, `CrewAI`, `AutoGen`, `LlamaIndex`) to use
 //! L402-gated APIs with Lightning payments.
+//!
+//! Supports LND REST, CLN REST, and `SwissKnife` backends.
 
 use std::collections::HashMap;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
+use bolt402_cln::ClnRestBackend;
 use bolt402_core::budget::Budget as RustBudget;
 use bolt402_core::cache::InMemoryTokenStore;
 use bolt402_core::receipt::Receipt as RustReceipt;
 use bolt402_core::{L402Client as RustClient, L402ClientConfig};
+use bolt402_lnd::LndRestBackend;
+use bolt402_proto::{LnBackend, NodeInfo, PaymentResult};
+use bolt402_swissknife::SwissKnifeBackend;
 
 /// Runtime handle shared across Python bindings.
 ///
@@ -184,6 +192,348 @@ impl PyReceipt {
 }
 
 // ---------------------------------------------------------------------------
+// PaymentResult
+// ---------------------------------------------------------------------------
+
+/// Result of a Lightning payment.
+///
+/// Contains proof-of-payment data returned by the backend after
+/// successfully paying a BOLT11 invoice.
+#[pyclass(name = "PaymentResult", from_py_object)]
+#[derive(Debug, Clone)]
+struct PyPaymentResult {
+    inner: PaymentResult,
+}
+
+#[pymethods]
+impl PyPaymentResult {
+    /// Hex-encoded payment preimage (proof of payment).
+    #[getter]
+    fn preimage(&self) -> &str {
+        &self.inner.preimage
+    }
+
+    /// Hex-encoded payment hash.
+    #[getter]
+    fn payment_hash(&self) -> &str {
+        &self.inner.payment_hash
+    }
+
+    /// Amount paid in satoshis (excluding routing fees).
+    #[getter]
+    fn amount_sats(&self) -> u64 {
+        self.inner.amount_sats
+    }
+
+    /// Routing fee paid in satoshis.
+    #[getter]
+    fn fee_sats(&self) -> u64 {
+        self.inner.fee_sats
+    }
+
+    /// Total cost (amount + fee) in satoshis.
+    fn total_cost_sats(&self) -> u64 {
+        self.inner.amount_sats + self.inner.fee_sats
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PaymentResult(amount_sats={}, fee_sats={}, hash='{}')",
+            self.inner.amount_sats, self.inner.fee_sats, self.inner.payment_hash,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NodeInfo
+// ---------------------------------------------------------------------------
+
+/// Information about a Lightning node.
+///
+/// Returned by backend `get_info()` calls. Contains the node's identity
+/// and channel count.
+#[pyclass(name = "NodeInfo", from_py_object)]
+#[derive(Debug, Clone)]
+struct PyNodeInfo {
+    inner: NodeInfo,
+}
+
+#[pymethods]
+impl PyNodeInfo {
+    /// Node public key (hex-encoded).
+    #[getter]
+    fn pubkey(&self) -> &str {
+        &self.inner.pubkey
+    }
+
+    /// Node alias.
+    #[getter]
+    fn alias(&self) -> &str {
+        &self.inner.alias
+    }
+
+    /// Number of active channels.
+    #[getter]
+    fn num_active_channels(&self) -> u32 {
+        self.inner.num_active_channels
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "NodeInfo(alias='{}', pubkey='{}', channels={})",
+            self.inner.alias, self.inner.pubkey, self.inner.num_active_channels,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Backend wrappers
+// ---------------------------------------------------------------------------
+
+/// LND REST backend for Lightning payments.
+///
+/// Connects to an LND node via its REST API (default port 8080).
+/// Authenticated with a hex-encoded admin macaroon.
+///
+/// Example::
+///
+///     from bolt402 import LndRestBackend
+///
+///     backend = LndRestBackend("https://localhost:8080", "deadbeef...")
+///     info = backend.get_info()
+///     print(info.alias)
+#[pyclass(name = "LndRestBackend", from_py_object)]
+#[derive(Debug, Clone)]
+struct PyLndRestBackend {
+    inner: LndRestBackend,
+}
+
+#[pymethods]
+impl PyLndRestBackend {
+    /// Create a new LND REST backend.
+    ///
+    /// Args:
+    ///     url: LND REST API URL (e.g. ``https://localhost:8080``)
+    ///     macaroon: Hex-encoded admin macaroon
+    #[new]
+    fn new(url: &str, macaroon: &str) -> PyResult<Self> {
+        let inner = LndRestBackend::new(url, macaroon)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to create LND backend: {e}")))?;
+        Ok(Self { inner })
+    }
+
+    /// Pay a BOLT11 Lightning invoice.
+    ///
+    /// Args:
+    ///     bolt11: BOLT11 invoice string
+    ///     max_fee_sats: Maximum routing fee in satoshis
+    ///
+    /// Returns:
+    ///     PaymentResult with preimage, hash, amount, and fee.
+    fn pay_invoice(&self, bolt11: &str, max_fee_sats: u64) -> PyResult<PyPaymentResult> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        let bolt11 = bolt11.to_string();
+
+        let result = rt.block_on(async move { inner.pay_invoice(&bolt11, max_fee_sats).await });
+
+        match result {
+            Ok(r) => Ok(PyPaymentResult { inner: r }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("payment failed: {e}"))),
+        }
+    }
+
+    /// Get the current spendable balance in satoshis.
+    fn get_balance(&self) -> PyResult<u64> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+
+        rt.block_on(async move { inner.get_balance().await })
+            .map_err(|e| PyRuntimeError::new_err(format!("get_balance failed: {e}")))
+    }
+
+    /// Get information about the connected Lightning node.
+    fn get_info(&self) -> PyResult<PyNodeInfo> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+
+        let result = rt.block_on(async move { inner.get_info().await });
+
+        match result {
+            Ok(info) => Ok(PyNodeInfo { inner: info }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("get_info failed: {e}"))),
+        }
+    }
+
+    #[allow(clippy::unused_self)]
+    fn __repr__(&self) -> String {
+        "LndRestBackend(...)".to_string()
+    }
+}
+
+/// CLN REST backend for Lightning payments.
+///
+/// Connects to a Core Lightning node via the CLN REST interface.
+/// Authenticated with a rune token (CLN's native bearer token system).
+///
+/// Example::
+///
+///     from bolt402 import ClnRestBackend
+///
+///     backend = ClnRestBackend("https://localhost:3001", "rune_token...")
+///     info = backend.get_info()
+///     print(info.alias)
+#[pyclass(name = "ClnRestBackend", from_py_object)]
+#[derive(Debug, Clone)]
+struct PyClnRestBackend {
+    inner: ClnRestBackend,
+}
+
+#[pymethods]
+impl PyClnRestBackend {
+    /// Create a new CLN REST backend using rune authentication.
+    ///
+    /// Args:
+    ///     url: CLN REST API URL (e.g. ``https://localhost:3001``)
+    ///     rune: Rune token string
+    #[new]
+    fn new(url: &str, rune: &str) -> PyResult<Self> {
+        let inner = ClnRestBackend::new(url, rune)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to create CLN backend: {e}")))?;
+        Ok(Self { inner })
+    }
+
+    /// Pay a BOLT11 Lightning invoice.
+    ///
+    /// Args:
+    ///     bolt11: BOLT11 invoice string
+    ///     max_fee_sats: Maximum routing fee in satoshis
+    ///
+    /// Returns:
+    ///     PaymentResult with preimage, hash, amount, and fee.
+    fn pay_invoice(&self, bolt11: &str, max_fee_sats: u64) -> PyResult<PyPaymentResult> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        let bolt11 = bolt11.to_string();
+
+        let result = rt.block_on(async move { inner.pay_invoice(&bolt11, max_fee_sats).await });
+
+        match result {
+            Ok(r) => Ok(PyPaymentResult { inner: r }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("payment failed: {e}"))),
+        }
+    }
+
+    /// Get the current spendable balance in satoshis.
+    fn get_balance(&self) -> PyResult<u64> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+
+        rt.block_on(async move { inner.get_balance().await })
+            .map_err(|e| PyRuntimeError::new_err(format!("get_balance failed: {e}")))
+    }
+
+    /// Get information about the connected Lightning node.
+    fn get_info(&self) -> PyResult<PyNodeInfo> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+
+        let result = rt.block_on(async move { inner.get_info().await });
+
+        match result {
+            Ok(info) => Ok(PyNodeInfo { inner: info }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("get_info failed: {e}"))),
+        }
+    }
+
+    #[allow(clippy::unused_self)]
+    fn __repr__(&self) -> String {
+        "ClnRestBackend(...)".to_string()
+    }
+}
+
+/// SwissKnife REST backend for Lightning payments.
+///
+/// Connects to a Numeraire SwissKnife instance using API key
+/// authentication. SwissKnife wallets are custodial Lightning accounts.
+///
+/// Example::
+///
+///     from bolt402 import SwissKnifeBackend
+///
+///     backend = SwissKnifeBackend("https://app.numeraire.tech", "sk-...")
+///     balance = backend.get_balance()
+///     print(f"Balance: {balance} sats")
+#[pyclass(name = "SwissKnifeBackend", from_py_object)]
+#[derive(Debug, Clone)]
+struct PySwissKnifeBackend {
+    inner: SwissKnifeBackend,
+}
+
+#[pymethods]
+impl PySwissKnifeBackend {
+    /// Create a new SwissKnife backend.
+    ///
+    /// Args:
+    ///     url: SwissKnife API URL (e.g. ``https://app.numeraire.tech``)
+    ///     api_key: API key for authentication
+    #[new]
+    fn new(url: &str, api_key: &str) -> Self {
+        Self {
+            inner: SwissKnifeBackend::new(url, api_key),
+        }
+    }
+
+    /// Pay a BOLT11 Lightning invoice.
+    ///
+    /// Args:
+    ///     bolt11: BOLT11 invoice string
+    ///     max_fee_sats: Maximum routing fee in satoshis
+    ///
+    /// Returns:
+    ///     PaymentResult with preimage, hash, amount, and fee.
+    fn pay_invoice(&self, bolt11: &str, max_fee_sats: u64) -> PyResult<PyPaymentResult> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        let bolt11 = bolt11.to_string();
+
+        let result = rt.block_on(async move { inner.pay_invoice(&bolt11, max_fee_sats).await });
+
+        match result {
+            Ok(r) => Ok(PyPaymentResult { inner: r }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("payment failed: {e}"))),
+        }
+    }
+
+    /// Get the current spendable balance in satoshis.
+    fn get_balance(&self) -> PyResult<u64> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+
+        rt.block_on(async move { inner.get_balance().await })
+            .map_err(|e| PyRuntimeError::new_err(format!("get_balance failed: {e}")))
+    }
+
+    /// Get information about the connected SwissKnife wallet.
+    fn get_info(&self) -> PyResult<PyNodeInfo> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+
+        let result = rt.block_on(async move { inner.get_info().await });
+
+        match result {
+            Ok(info) => Ok(PyNodeInfo { inner: info }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("get_info failed: {e}"))),
+        }
+    }
+
+    #[allow(clippy::unused_self)]
+    fn __repr__(&self) -> String {
+        "SwissKnifeBackend(...)".to_string()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // L402Response
 // ---------------------------------------------------------------------------
 
@@ -195,6 +545,7 @@ impl PyReceipt {
 struct PyL402Response {
     status: u16,
     paid: bool,
+    cached_token: bool,
     receipt: Option<PyReceipt>,
     body: String,
     headers: HashMap<String, String>,
@@ -212,6 +563,12 @@ impl PyL402Response {
     #[getter]
     fn paid(&self) -> bool {
         self.paid
+    }
+
+    /// Whether a cached L402 token was reused (no new payment needed).
+    #[getter]
+    fn cached_token(&self) -> bool {
+        self.cached_token
     }
 
     /// Payment receipt, if a payment was made.
@@ -238,7 +595,10 @@ impl PyL402Response {
     }
 
     fn __repr__(&self) -> String {
-        format!("L402Response(status={}, paid={})", self.status, self.paid,)
+        format!(
+            "L402Response(status={}, paid={}, cached_token={})",
+            self.status, self.paid, self.cached_token,
+        )
     }
 }
 
@@ -251,6 +611,24 @@ impl PyL402Response {
 /// Intercepts HTTP 402 responses, parses L402 challenges, pays Lightning
 /// invoices via the configured backend, caches tokens, enforces budgets,
 /// and records receipts.
+///
+/// Use one of the static constructor methods to create a client with a
+/// specific backend:
+///
+/// - ``L402Client.with_lnd_rest(...)``
+/// - ``L402Client.with_cln_rest(...)``
+/// - ``L402Client.with_swissknife(...)``
+///
+/// Example::
+///
+///     from bolt402 import L402Client, Budget
+///
+///     client = L402Client.with_lnd_rest(
+///         "https://localhost:8080",
+///         "deadbeef...",
+///     )
+///     response = client.get("https://api.example.com/data")
+///     print(response.status, response.paid)
 #[pyclass(name = "L402Client")]
 struct PyL402Client {
     inner: RustClient,
@@ -258,48 +636,65 @@ struct PyL402Client {
 
 #[pymethods]
 impl PyL402Client {
-    /// Create a new `L402Client`.
-    #[new]
-    #[pyo3(signature = (*, backend="mock", budget=None, max_fee_sats=100, mock_server_url=None))]
-    fn new(
-        backend: &str,
+    /// Create an L402 client backed by LND REST.
+    ///
+    /// Args:
+    ///     url: LND REST API URL (e.g. ``https://localhost:8080``)
+    ///     macaroon: Hex-encoded admin macaroon
+    ///     budget: Optional budget configuration (default: unlimited)
+    ///     max_fee_sats: Maximum routing fee in satoshis (default: 100)
+    #[staticmethod]
+    #[pyo3(signature = (url, macaroon, budget=None, max_fee_sats=100))]
+    fn with_lnd_rest(
+        url: &str,
+        macaroon: &str,
         budget: Option<PyBudget>,
         max_fee_sats: u64,
-        mock_server_url: Option<&str>,
     ) -> PyResult<Self> {
-        let _budget = budget.unwrap_or_else(|| PyBudget {
-            inner: RustBudget::unlimited(),
-        });
+        let backend = LndRestBackend::new(url, macaroon)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to create LND backend: {e}")))?;
 
-        let _config = L402ClientConfig {
-            max_fee_sats,
-            max_retries: 1,
-            user_agent: format!("bolt402-python/{}", env!("CARGO_PKG_VERSION")),
-        };
+        build_client(backend, budget, max_fee_sats)
+    }
 
-        match backend {
-            "mock" => {
-                let _url = mock_server_url.ok_or_else(|| {
-                    PyValueError::new_err(
-                        "mock_server_url is required when backend='mock'. \
-                         Use create_mock_client() for a connected pair instead.",
-                    )
-                })?;
+    /// Create an L402 client backed by CLN REST with rune auth.
+    ///
+    /// Args:
+    ///     url: CLN REST API URL (e.g. ``https://localhost:3001``)
+    ///     rune: Rune token string
+    ///     budget: Optional budget configuration (default: unlimited)
+    ///     max_fee_sats: Maximum routing fee in satoshis (default: 100)
+    #[staticmethod]
+    #[pyo3(signature = (url, rune, budget=None, max_fee_sats=100))]
+    fn with_cln_rest(
+        url: &str,
+        rune: &str,
+        budget: Option<PyBudget>,
+        max_fee_sats: u64,
+    ) -> PyResult<Self> {
+        let backend = ClnRestBackend::new(url, rune)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to create CLN backend: {e}")))?;
 
-                // The mock backend needs direct access to the server's challenge
-                // registry. A standalone URL connection is not possible.
-                // Users should use create_mock_client() instead.
-                Err(PyValueError::new_err(
-                    "use create_mock_client() for a properly connected mock setup. \
-                     Direct L402Client(backend='mock') is not supported because the \
-                     mock backend requires a shared challenge registry with the server.",
-                ))
-            }
-            other => Err(PyValueError::new_err(format!(
-                "unsupported backend: '{other}'. Available: 'mock' (via create_mock_client()). \
-                 LND and SwissKnife backends coming soon."
-            ))),
-        }
+        build_client(backend, budget, max_fee_sats)
+    }
+
+    /// Create an L402 client backed by SwissKnife REST.
+    ///
+    /// Args:
+    ///     url: SwissKnife API URL (e.g. ``https://app.numeraire.tech``)
+    ///     api_key: API key for authentication
+    ///     budget: Optional budget configuration (default: unlimited)
+    ///     max_fee_sats: Maximum routing fee in satoshis (default: 100)
+    #[staticmethod]
+    #[pyo3(signature = (url, api_key, budget=None, max_fee_sats=100))]
+    fn with_swissknife(
+        url: &str,
+        api_key: &str,
+        budget: Option<PyBudget>,
+        max_fee_sats: u64,
+    ) -> PyResult<Self> {
+        let backend = SwissKnifeBackend::new(url, api_key);
+        build_client(backend, budget, max_fee_sats)
     }
 
     /// Send a GET request, automatically handling L402 payment challenges.
@@ -315,7 +710,7 @@ impl PyL402Client {
 
     /// Send a POST request with an optional JSON body.
     ///
-    /// See `get()` for the full L402 flow description.
+    /// See ``get()`` for the full L402 flow description.
     #[pyo3(signature = (url, body=None))]
     fn post(&self, url: &str, body: Option<&str>) -> PyResult<PyL402Response> {
         let rt = get_runtime();
@@ -345,6 +740,31 @@ impl PyL402Client {
     }
 }
 
+/// Build an `L402Client` from any `LnBackend` implementation.
+fn build_client<B: LnBackend + 'static>(
+    backend: B,
+    budget: Option<PyBudget>,
+    max_fee_sats: u64,
+) -> PyResult<PyL402Client> {
+    let budget = budget.map_or_else(RustBudget::unlimited, |b| b.inner);
+
+    let config = L402ClientConfig {
+        max_fee_sats,
+        max_retries: 1,
+        user_agent: format!("bolt402-python/{}", env!("CARGO_PKG_VERSION")),
+    };
+
+    let client = RustClient::builder()
+        .ln_backend(backend)
+        .token_store(InMemoryTokenStore::default())
+        .budget(budget)
+        .config(config)
+        .build()
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to build L402Client: {e}")))?;
+
+    Ok(PyL402Client { inner: client })
+}
+
 /// Convert a Rust `L402Response` result to a Python `PyL402Response`.
 fn convert_response(
     rt: &tokio::runtime::Runtime,
@@ -354,6 +774,7 @@ fn convert_response(
         Ok(resp) => {
             let status = resp.status().as_u16();
             let paid = resp.paid();
+            let cached_token = resp.cached_token();
             let receipt = resp.receipt().map(|r| PyReceipt { inner: r.clone() });
             let headers: HashMap<String, String> = resp
                 .headers()
@@ -365,151 +786,13 @@ fn convert_response(
             Ok(PyL402Response {
                 status,
                 paid,
+                cached_token,
                 receipt,
                 body,
                 headers,
             })
         }
         Err(e) => Err(map_client_error(&e)),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// MockL402Server
-// ---------------------------------------------------------------------------
-
-/// Mock L402 server for testing and development.
-///
-/// Starts a local HTTP server that responds with L402 challenges for
-/// configured endpoints. Use with `create_mock_client()` for testing
-/// without real Lightning infrastructure.
-#[pyclass(name = "MockL402Server")]
-struct PyMockL402Server {
-    url: String,
-    // The server and backend live on the tokio runtime; we hold Arcs
-    // to keep them alive as long as the Python object exists.
-    _server: std::sync::Arc<bolt402_mock::MockL402Server>,
-    _backend: std::sync::Arc<bolt402_mock::MockLnBackend>,
-}
-
-#[pymethods]
-impl PyMockL402Server {
-    /// Create and start a mock L402 server.
-    #[new]
-    #[pyo3(signature = (endpoints))]
-    #[allow(clippy::needless_pass_by_value)] // PyO3 requires owned HashMap
-    fn new(endpoints: HashMap<String, u64>) -> PyResult<Self> {
-        let rt = get_runtime();
-
-        let result = rt.block_on(async {
-            let mut builder = bolt402_mock::MockL402Server::builder();
-            for (path, price) in &endpoints {
-                builder = builder.endpoint(path, bolt402_mock::EndpointConfig::new(*price));
-            }
-            builder.build().await
-        });
-
-        match result {
-            Ok(server) => {
-                let url = server.url();
-                let backend = server.mock_backend();
-                Ok(Self {
-                    url,
-                    _server: std::sync::Arc::new(server),
-                    _backend: std::sync::Arc::new(backend),
-                })
-            }
-            Err(e) => Err(PyRuntimeError::new_err(format!(
-                "failed to start mock server: {e}"
-            ))),
-        }
-    }
-
-    /// Base URL of the running mock server.
-    #[getter]
-    fn url(&self) -> &str {
-        &self.url
-    }
-
-    fn __repr__(&self) -> String {
-        format!("MockL402Server(url='{}')", self.url)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// create_mock_client
-// ---------------------------------------------------------------------------
-
-/// Create a mock L402 client and server pair for testing.
-///
-/// Returns a tuple of (`L402Client`, `MockL402Server`). The client is
-/// pre-configured with the mock Lightning backend connected to the
-/// server's challenge registry.
-#[pyfunction]
-#[pyo3(signature = (endpoints, budget=None, max_fee_sats=100))]
-#[allow(clippy::needless_pass_by_value)] // PyO3 requires owned HashMap
-fn create_mock_client(
-    endpoints: HashMap<String, u64>,
-    budget: Option<PyBudget>,
-    max_fee_sats: u64,
-) -> PyResult<(PyL402Client, PyMockL402Server)> {
-    let rt = get_runtime();
-    let budget = budget.map_or_else(RustBudget::unlimited, |b| b.inner);
-
-    let config = L402ClientConfig {
-        max_fee_sats,
-        max_retries: 1,
-        user_agent: format!("bolt402-python/{}", env!("CARGO_PKG_VERSION")),
-    };
-
-    let result: Result<
-        (
-            RustClient,
-            String,
-            std::sync::Arc<bolt402_mock::MockL402Server>,
-            std::sync::Arc<bolt402_mock::MockLnBackend>,
-        ),
-        String,
-    > = rt.block_on(async {
-        let mut builder = bolt402_mock::MockL402Server::builder();
-        for (path, price) in &endpoints {
-            builder = builder.endpoint(path, bolt402_mock::EndpointConfig::new(*price));
-        }
-        let server = builder
-            .build()
-            .await
-            .map_err(|e| format!("failed to start server: {e}"))?;
-
-        let url = server.url();
-        let mock_backend = server.mock_backend();
-        let token_store = InMemoryTokenStore::default();
-
-        let client = RustClient::builder()
-            .ln_backend(mock_backend.clone())
-            .token_store(token_store)
-            .budget(budget)
-            .config(config)
-            .build()
-            .map_err(|e| format!("failed to build client: {e}"))?;
-
-        Ok((
-            client,
-            url,
-            std::sync::Arc::new(server),
-            std::sync::Arc::new(mock_backend),
-        ))
-    });
-
-    match result {
-        Ok((client, url, server_arc, backend_arc)) => Ok((
-            PyL402Client { inner: client },
-            PyMockL402Server {
-                url,
-                _server: server_arc,
-                _backend: backend_arc,
-            },
-        )),
-        Err(e) => Err(PyRuntimeError::new_err(e)),
     }
 }
 
@@ -544,10 +827,13 @@ fn map_client_error(err: &bolt402_proto::ClientError) -> PyErr {
 fn _bolt402(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBudget>()?;
     m.add_class::<PyReceipt>()?;
+    m.add_class::<PyPaymentResult>()?;
+    m.add_class::<PyNodeInfo>()?;
+    m.add_class::<PyLndRestBackend>()?;
+    m.add_class::<PyClnRestBackend>()?;
+    m.add_class::<PySwissKnifeBackend>()?;
     m.add_class::<PyL402Response>()?;
     m.add_class::<PyL402Client>()?;
-    m.add_class::<PyMockL402Server>()?;
-    m.add_function(wrap_pyfunction!(create_mock_client, m)?)?;
     Ok(())
 }
 
@@ -623,5 +909,80 @@ mod tests {
     fn fmt_opt_helper() {
         assert_eq!(fmt_opt(Some(42)), "42");
         assert_eq!(fmt_opt(None), "None");
+    }
+
+    #[test]
+    fn lnd_backend_constructor_valid() {
+        let backend = PyLndRestBackend::new("https://localhost:8080", "deadbeef");
+        assert!(backend.is_ok());
+    }
+
+    #[test]
+    fn cln_backend_constructor_valid() {
+        let backend = PyClnRestBackend::new("https://localhost:3001", "test_rune");
+        assert!(backend.is_ok());
+    }
+
+    #[test]
+    fn swissknife_backend_constructor() {
+        let backend = PySwissKnifeBackend::new("https://app.numeraire.tech", "sk-test");
+        assert_eq!(backend.__repr__(), "SwissKnifeBackend(...)");
+    }
+
+    #[test]
+    fn payment_result_total_cost() {
+        let result = PyPaymentResult {
+            inner: PaymentResult {
+                preimage: "abc".to_string(),
+                payment_hash: "def".to_string(),
+                amount_sats: 100,
+                fee_sats: 5,
+            },
+        };
+        assert_eq!(result.total_cost_sats(), 105);
+        assert_eq!(result.amount_sats(), 100);
+        assert_eq!(result.fee_sats(), 5);
+    }
+
+    #[test]
+    fn node_info_properties() {
+        let info = PyNodeInfo {
+            inner: NodeInfo {
+                pubkey: "02abc".to_string(),
+                alias: "mynode".to_string(),
+                num_active_channels: 5,
+            },
+        };
+        assert_eq!(info.pubkey(), "02abc");
+        assert_eq!(info.alias(), "mynode");
+        assert_eq!(info.num_active_channels(), 5);
+        assert!(info.__repr__().contains("mynode"));
+    }
+
+    #[test]
+    fn client_with_lnd_rest_constructor() {
+        let result = PyL402Client::with_lnd_rest("https://localhost:8080", "deadbeef", None, 100);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn client_with_cln_rest_constructor() {
+        let result = PyL402Client::with_cln_rest("https://localhost:3001", "test_rune", None, 100);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn client_with_swissknife_constructor() {
+        let result =
+            PyL402Client::with_swissknife("https://app.numeraire.tech", "sk-test", None, 100);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn client_with_budget() {
+        let budget = PyBudget::new(Some(100), None, None, Some(10000), None);
+        let result =
+            PyL402Client::with_lnd_rest("https://localhost:8080", "deadbeef", Some(budget), 50);
+        assert!(result.is_ok());
     }
 }

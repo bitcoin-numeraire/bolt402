@@ -5,12 +5,15 @@ L402-gated APIs using Lightning Network payments via bolt402.
 
 Quick start::
 
-    from bolt402 import create_mock_client
-    from bolt402_langchain import L402FetchTool, L402BudgetTool
+    from bolt402_langchain import create_l402_client, L402FetchTool
 
-    client, server = create_mock_client({"/api/data": 100})
+    client = create_l402_client(
+        backend="lnd",
+        url="https://localhost:8080",
+        macaroon="deadbeef...",
+    )
     fetch = L402FetchTool(client=client)
-    result = fetch.invoke(f"{server.url}/api/data")
+    result = fetch.invoke("https://api.example.com/data")
 
 Classes:
     L402FetchTool: LangChain tool for L402-aware HTTP requests.
