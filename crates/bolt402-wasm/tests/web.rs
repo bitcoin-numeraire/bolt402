@@ -63,11 +63,7 @@ fn cln_rest_backend_constructs() {
     assert!(backend.is_ok());
 }
 
-#[wasm_bindgen_test]
-fn cln_rest_backend_with_rune() {
-    let backend = WasmClnRestBackend::with_rune("https://localhost:3001", "test-rune");
-    assert!(backend.is_ok());
-}
+
 
 // ---------------------------------------------------------------------------
 // L402 client construction

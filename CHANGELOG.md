@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **bolt402-lnd**: LND REST backend adapter (`LndRestBackend`) behind `rest` feature flag. WASM-compatible. (#63)
 - **bolt402-cln**: Core Lightning (CLN) gRPC backend adapter implementing `LnBackend`. (#53)
-- **bolt402-cln**: Core Lightning (CLN) REST backend adapter (`ClnRestBackend`) behind `rest` feature flag. Supports macaroon or rune authentication and is WASM-compatible.
+- **bolt402-cln**: Core Lightning (CLN) REST backend adapter (`ClnRestBackend`) behind `rest` feature flag. Supports rune authentication and is WASM-compatible.
 - **bolt402-nwc**: Nostr Wallet Connect (NIP-47) backend adapter implementing `LnBackend`. (#51)
 - **bolt402-sqlite**: SQLite persistent token store implementing `TokenStore`. (#48)
 - **bolt402-ffi**: C-compatible FFI layer for cross-language bindings. (#44)

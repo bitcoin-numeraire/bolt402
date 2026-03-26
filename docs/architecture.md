@@ -33,7 +33,7 @@ bolt402-lnd  bolt402-  │  bolt402-  bolt402-    bolt402-wasm
 | `bolt402-proto` | Shared protocol types: `L402Challenge`, `L402Token`, `L402Error`, `ClientError`. **Also owns all port traits** (`LnBackend`, `TokenStore`) and shared domain types (`PaymentResult`, `NodeInfo`). No async runtime dependency (no tokio). WASM-safe. |
 | `bolt402-core` | The L402 client engine. Contains `L402Client` (HTTP orchestration with reqwest), `BudgetTracker`, `InMemoryTokenStore`, and `Receipt`. Depends on `bolt402-proto` for port traits and shared types. |
 | `bolt402-lnd` | Implements `LnBackend` for LND. Two feature-gated backends: `grpc` (tonic, requires tokio) and `rest` (reqwest, WASM-compatible). Depends on `bolt402-proto` only. |
-| `bolt402-cln` | Implements `LnBackend` for Core Lightning (CLN). Supports gRPC with mTLS and REST via the `clnrest` plugin (macaroon or rune auth, WASM-compatible). |
+| `bolt402-cln` | Implements `LnBackend` for Core Lightning (CLN). Supports gRPC with mTLS and REST with rune authentication (WASM-compatible). |
 | `bolt402-nwc` | Implements `LnBackend` for Nostr Wallet Connect (NIP-47). |
 | `bolt402-swissknife` | Implements `LnBackend` for Numeraire SwissKnife via REST API. Depends on `bolt402-proto` only. WASM-compatible. |
 | `bolt402-mock` | A mock L402 server and mock Lightning backend for testing. No real Lightning infrastructure needed. |

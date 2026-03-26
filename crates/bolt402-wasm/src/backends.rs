@@ -1,7 +1,7 @@
 //! WASM-bindgen wrappers for the real Lightning backends.
 //!
-//! Exposes `LndRestBackend` and `SwissKnifeBackend` from Rust to JavaScript
-//! via wasm-bindgen, using proper typed structs (not `js_sys::Reflect`).
+//! Exposes `LndRestBackend`, `ClnRestBackend`, and `SwissKnifeBackend` from
+//! Rust to JavaScript via wasm-bindgen, using proper typed structs.
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
@@ -184,7 +184,7 @@ impl WasmLndRestBackend {
 /// CLN REST backend for use in JavaScript/TypeScript.
 ///
 /// Wraps the Rust `ClnRestBackend` which uses `reqwest` (compiled to
-/// browser `fetch` on WASM). Supports both macaroon and rune authentication.
+/// browser `fetch` on WASM). Authenticates via rune token.
 ///
 /// # Example
 ///
@@ -193,7 +193,7 @@ impl WasmLndRestBackend {
 ///
 /// await init();
 ///
-/// const cln = new WasmClnRestBackend("https://localhost:3001", "deadbeef...");
+/// const cln = new WasmClnRestBackend("https://localhost:3001", "rune_token...");
 /// const info = await cln.getInfo();
 /// console.log(info.alias);
 /// ```
@@ -204,28 +204,15 @@ pub struct WasmClnRestBackend {
 
 #[wasm_bindgen]
 impl WasmClnRestBackend {
-    /// Create a new CLN REST backend using macaroon authentication.
-    ///
-    /// # Arguments
-    ///
-    /// * `url` - CLN REST API URL (e.g. `https://localhost:3001`)
-    /// * `macaroon` - Hex-encoded access macaroon
-    #[wasm_bindgen(constructor)]
-    pub fn new(url: &str, macaroon: &str) -> Result<WasmClnRestBackend, JsError> {
-        let inner = ClnRestBackend::new(url, macaroon)
-            .map_err(|e| JsError::new(&format!("failed to create CLN backend: {e}")))?;
-        Ok(Self { inner })
-    }
-
     /// Create a new CLN REST backend using rune authentication.
     ///
     /// # Arguments
     ///
     /// * `url` - CLN REST API URL (e.g. `https://localhost:3001`)
     /// * `rune` - Rune token string
-    #[wasm_bindgen(js_name = "withRune")]
-    pub fn with_rune(url: &str, rune: &str) -> Result<WasmClnRestBackend, JsError> {
-        let inner = ClnRestBackend::with_rune(url, rune)
+    #[wasm_bindgen(constructor)]
+    pub fn new(url: &str, rune: &str) -> Result<WasmClnRestBackend, JsError> {
+        let inner = ClnRestBackend::new(url, rune)
             .map_err(|e| JsError::new(&format!("failed to create CLN backend: {e}")))?;
         Ok(Self { inner })
     }

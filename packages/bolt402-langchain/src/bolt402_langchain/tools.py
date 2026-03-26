@@ -29,12 +29,15 @@ class L402FetchTool(BaseTool):
 
     Example::
 
-        from bolt402 import create_mock_client
-        from bolt402_langchain import L402FetchTool
+        from bolt402_langchain import create_l402_client, L402FetchTool
 
-        client, server = create_mock_client({"/api/data": 100})
+        client = create_l402_client(
+            backend="lnd",
+            url="https://localhost:8080",
+            macaroon="deadbeef...",
+        )
         tool = L402FetchTool(client=client)
-        result = tool.invoke(f"{server.url}/api/data")
+        result = tool.invoke("https://api.example.com/data")
     """
 
     name: ClassVar[str] = "l402_fetch"
@@ -86,13 +89,15 @@ class L402BudgetTool(BaseTool):
 
     Example::
 
-        from bolt402 import create_mock_client
-        from bolt402_langchain import L402BudgetTool
+        from bolt402_langchain import create_l402_client, L402BudgetTool
 
-        client, server = create_mock_client({"/api/data": 100})
+        client = create_l402_client(
+            backend="lnd",
+            url="https://localhost:8080",
+            macaroon="deadbeef...",
+        )
         tool = L402BudgetTool(client=client)
-        client.get(f"{server.url}/api/data")
-        result = tool.invoke("")  # "Total spent: 100 sats ..."
+        result = tool.invoke("")  # "No payments made yet. ..."
     """
 
     name: ClassVar[str] = "l402_check_budget"

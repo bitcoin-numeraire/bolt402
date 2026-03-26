@@ -9,37 +9,40 @@ from __future__ import annotations
 
 from typing import Any, Optional, Union
 
-from bolt402 import Budget, L402Client, MockL402Server, create_mock_client
+from bolt402 import Budget, L402Client
 
 
 def create_l402_client(
     *,
-    backend: str = "mock",
-    endpoints: Optional[dict[str, int]] = None,
+    backend: str,
+    url: str,
+    macaroon: Optional[str] = None,
+    rune: Optional[str] = None,
+    api_key: Optional[str] = None,
     budget: Optional[Union[Budget, dict[str, Any]]] = None,
     max_fee_sats: int = 100,
-) -> tuple[L402Client, Optional[MockL402Server]]:
+) -> L402Client:
     """Create a configured L402 client for use with LangChain tools.
 
-    Factory function that simplifies client creation. Currently supports
-    the mock backend for testing and development. Real Lightning backends
-    (LND, CLN, NWC, SwissKnife) will be added as the ``bolt402`` Python
-    bindings gain support for them.
+    Factory function that simplifies client creation. Supports LND REST,
+    CLN REST, and SwissKnife backends.
 
     Args:
-        backend: Lightning backend type. Currently only ``"mock"`` is
-            supported.
-        endpoints: Map of endpoint paths to prices in satoshis. Required
-            when ``backend="mock"``.
+        backend: Lightning backend type. One of ``"lnd"``, ``"cln"``,
+            or ``"swissknife"``.
+        url: Backend API URL (e.g. ``https://localhost:8080`` for LND).
+        macaroon: Hex-encoded admin macaroon. Required for ``"lnd"``
+            backend.
+        rune: Rune token string. Required for ``"cln"`` backend.
+        api_key: API key for authentication. Required for
+            ``"swissknife"`` backend.
         budget: Spending limits. Can be a ``Budget`` instance or a dict
             with keys ``per_request_max``, ``hourly_max``, ``daily_max``,
             ``total_max``.
         max_fee_sats: Maximum routing fee in satoshis per payment.
 
     Returns:
-        A tuple of ``(client, server)``. For mock backend, ``server`` is
-        the running ``MockL402Server``. For real backends (future),
-        ``server`` will be ``None``.
+        A configured ``L402Client`` instance.
 
     Raises:
         ValueError: If the backend is not supported or required parameters
@@ -49,31 +52,57 @@ def create_l402_client(
 
         from bolt402_langchain import create_l402_client
 
-        client, server = create_l402_client(
-            backend="mock",
-            endpoints={"/api/data": 100, "/api/premium": 500},
+        client = create_l402_client(
+            backend="lnd",
+            url="https://localhost:8080",
+            macaroon="deadbeef...",
             budget={"per_request_max": 200, "daily_max": 5000},
         )
     """
     resolved_budget = _resolve_budget(budget)
 
-    if backend == "mock":
-        if not endpoints:
+    if backend == "lnd":
+        if not macaroon:
             raise ValueError(
-                "endpoints dict is required for mock backend. "
-                "Example: endpoints={'/api/data': 100}"
+                "macaroon is required for LND backend. "
+                "Provide a hex-encoded admin macaroon."
             )
-        client, server = create_mock_client(
-            endpoints,
+        return L402Client.with_lnd_rest(
+            url,
+            macaroon,
             budget=resolved_budget,
             max_fee_sats=max_fee_sats,
         )
-        return client, server
+
+    if backend == "cln":
+        if not rune:
+            raise ValueError(
+                "rune is required for CLN backend. "
+                "Provide a CLN rune token string."
+            )
+        return L402Client.with_cln_rest(
+            url,
+            rune,
+            budget=resolved_budget,
+            max_fee_sats=max_fee_sats,
+        )
+
+    if backend == "swissknife":
+        if not api_key:
+            raise ValueError(
+                "api_key is required for SwissKnife backend. "
+                "Provide a SwissKnife API key."
+            )
+        return L402Client.with_swissknife(
+            url,
+            api_key,
+            budget=resolved_budget,
+            max_fee_sats=max_fee_sats,
+        )
 
     raise ValueError(
         f"Unsupported backend: {backend!r}. "
-        f"Currently supported: 'mock'. "
-        f"Real backends (LND, CLN, NWC) coming soon."
+        f"Supported: 'lnd', 'cln', 'swissknife'."
     )
 
 

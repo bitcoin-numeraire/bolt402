@@ -6,6 +6,9 @@ They are skipped when the regtest Docker stack is not running.
 Required env vars (from tests/regtest/.env.regtest):
     L402_SERVER_URL, LND_REST_HOST, LND_MACAROON_HEX
 
+Optional env vars:
+    SWISSKNIFE_API_URL, SWISSKNIFE_API_KEY
+
 Run with:
     pytest tests/test_regtest.py -v
 """
@@ -36,6 +39,11 @@ for _p in _env_candidates:
         break
 
 L402_SERVER_URL = os.environ.get("L402_SERVER_URL", "http://localhost:8081")
+LND_REST_HOST = os.environ.get("LND_REST_HOST", "https://localhost:8080")
+LND_MACAROON_HEX = os.environ.get("LND_MACAROON_HEX", "")
+
+SWISSKNIFE_API_URL = os.environ.get("SWISSKNIFE_API_URL", "")
+SWISSKNIFE_API_KEY = os.environ.get("SWISSKNIFE_API_KEY", "")
 
 
 def _regtest_available() -> bool:
@@ -50,6 +58,16 @@ def _regtest_available() -> bool:
         return False
 
 
+def _has_lnd_credentials() -> bool:
+    """Check if LND REST credentials are available."""
+    return bool(LND_MACAROON_HEX)
+
+
+def _has_swissknife_credentials() -> bool:
+    """Check if SwissKnife credentials are available."""
+    return bool(SWISSKNIFE_API_URL) and bool(SWISSKNIFE_API_KEY)
+
+
 # Skip entire module if regtest is not running
 pytestmark = pytest.mark.skipif(
     not _regtest_available(),
@@ -57,60 +75,245 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# The Python bindings currently only support 'mock' backend via create_mock_client().
-# Direct LND/SwissKnife backends are not yet exposed in PyO3.
-# These tests verify the mock infrastructure works correctly as a baseline.
-# When real backends are added to the Python bindings, these will be extended.
-
-from bolt402 import Budget, create_mock_client
+from bolt402 import Budget, L402Client, LndRestBackend, SwissKnifeBackend
 
 
-class TestPythonBindingsWithMock:
-    """Baseline tests verifying the Python bindings work correctly.
+# ---------------------------------------------------------------------------
+# LND REST backend tests
+# ---------------------------------------------------------------------------
 
-    These use the mock server (not regtest Lightning) but confirm the
-    Python-to-Rust bridge is functional. Real backend tests will be
-    added when LND/SwissKnife backends are exposed via PyO3.
-    """
 
-    def test_full_mock_flow(self):
-        """Verify full L402 flow through Python bindings using mock."""
-        client, server = create_mock_client({"/api/data": 100})
-        response = client.get(f"{server.url}/api/data")
+@pytest.mark.skipif(not _has_lnd_credentials(), reason="LND credentials not available")
+class TestLndRestBackend:
+    """Tests for the LND REST backend against regtest."""
 
+    def test_get_info(self):
+        """Verify LND node connectivity."""
+        backend = LndRestBackend(LND_REST_HOST, LND_MACAROON_HEX)
+        info = backend.get_info()
+        assert info.pubkey
+        assert info.num_active_channels > 0
+
+    def test_get_balance(self):
+        """Verify LND balance query."""
+        backend = LndRestBackend(LND_REST_HOST, LND_MACAROON_HEX)
+        balance = backend.get_balance()
+        assert balance > 1000
+
+
+@pytest.mark.skipif(not _has_lnd_credentials(), reason="LND credentials not available")
+class TestLndRestL402Flow:
+    """Full L402 protocol flow using LND REST backend."""
+
+    def test_full_flow(self):
+        """GET request with automatic L402 payment."""
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        response = client.get(f"{L402_SERVER_URL}/api/data")
+        assert response.status == 200
+        assert response.paid is True
+        assert response.receipt is not None
+        assert response.receipt.amount_sats == 100
+        assert response.receipt.response_status == 200
+        assert len(response.receipt.payment_hash) > 0
+        assert len(response.receipt.preimage) > 0
+
+    def test_response_json(self):
+        """Verify response body is parseable JSON."""
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        response = client.get(f"{L402_SERVER_URL}/api/data")
+        data = response.json()
+        assert data["ok"] is True
+
+    def test_nonexistent_endpoint(self):
+        """Non-existent endpoints return 404 without payment."""
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        response = client.get(f"{L402_SERVER_URL}/api/nonexistent")
+        assert response.status == 404
+        assert response.paid is False
+        assert response.receipt is None
+
+    def test_token_caching(self):
+        """Tokens are cached and reused on subsequent requests."""
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        # First request: should pay
+        r1 = client.get(f"{L402_SERVER_URL}/api/data")
+        assert r1.paid is True
+        assert r1.cached_token is False
+
+        # Second request: should use cached token (no payment)
+        r2 = client.get(f"{L402_SERVER_URL}/api/data")
+        assert r2.paid is False
+        assert r2.cached_token is True
+        assert r2.status == 200
+
+        # Only one receipt
+        assert len(client.receipts()) == 1
+
+    def test_budget_enforcement(self):
+        """Budget limits prevent overspending."""
+        budget = Budget(per_request_max=50)
+        client = L402Client.with_lnd_rest(
+            LND_REST_HOST,
+            LND_MACAROON_HEX,
+            budget=budget,
+        )
+
+        # 100-sat endpoint should exceed per-request limit of 50
+        with pytest.raises(ValueError, match="BudgetExceeded"):
+            client.get(f"{L402_SERVER_URL}/api/data")
+
+    def test_budget_allows_cheap_request(self):
+        """Requests within budget succeed."""
+        budget = Budget(per_request_max=200)
+        client = L402Client.with_lnd_rest(
+            LND_REST_HOST,
+            LND_MACAROON_HEX,
+            budget=budget,
+        )
+
+        response = client.get(f"{L402_SERVER_URL}/api/data")
+        assert response.status == 200
+        assert response.paid is True
+
+    def test_total_budget_enforcement(self):
+        """Total budget is enforced across multiple requests."""
+        budget = Budget(total_max=150)
+        client = L402Client.with_lnd_rest(
+            LND_REST_HOST,
+            LND_MACAROON_HEX,
+            budget=budget,
+        )
+
+        # First request: 100 sats (within budget)
+        r1 = client.get(f"{L402_SERVER_URL}/api/data")
+        assert r1.status == 200
+
+        # Second request to different endpoint: would exceed total budget
+        with pytest.raises(ValueError, match="BudgetExceeded"):
+            client.get(f"{L402_SERVER_URL}/api/premium")
+
+    def test_receipts_accumulate(self):
+        """Receipts are recorded across multiple requests."""
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        client.get(f"{L402_SERVER_URL}/api/cheap")
+        client.get(f"{L402_SERVER_URL}/api/data")
+
+        receipts = client.receipts()
+        assert len(receipts) == 2
+        assert receipts[0].amount_sats == 10
+        assert receipts[1].amount_sats == 100
+
+    def test_total_spent(self):
+        """Total spent tracker is accurate."""
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        assert client.total_spent() == 0
+        client.get(f"{L402_SERVER_URL}/api/cheap")
+        assert client.total_spent() == 10
+        client.get(f"{L402_SERVER_URL}/api/data")
+        assert client.total_spent() == 110
+
+    def test_receipt_preimage_matches_hash(self):
+        """Preimage hashes to the payment hash (proof of payment)."""
+        import hashlib
+
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        response = client.get(f"{L402_SERVER_URL}/api/cheap")
+        receipt = response.receipt
+
+        preimage_bytes = bytes.fromhex(receipt.preimage)
+        computed_hash = hashlib.sha256(preimage_bytes).hexdigest()
+        assert computed_hash == receipt.payment_hash
+
+    def test_multiple_sequential_payments(self):
+        """Multiple endpoints can be paid in sequence."""
+        client = L402Client.with_lnd_rest(LND_REST_HOST, LND_MACAROON_HEX)
+
+        endpoints = [
+            ("/api/cheap", 10),
+            ("/api/data", 100),
+            ("/api/premium", 500),
+        ]
+
+        for path, expected_sats in endpoints:
+            response = client.get(f"{L402_SERVER_URL}{path}")
+            assert response.status == 200
+            assert response.paid is True
+            assert response.receipt.amount_sats == expected_sats
+
+        assert client.total_spent() == 610
+
+
+# ---------------------------------------------------------------------------
+# SwissKnife backend tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not _has_swissknife_credentials(),
+    reason="SwissKnife credentials not available",
+)
+class TestSwissKnifeL402Flow:
+    """Full L402 protocol flow using SwissKnife backend."""
+
+    def test_get_info(self):
+        """Verify SwissKnife connectivity."""
+        backend = SwissKnifeBackend(SWISSKNIFE_API_URL, SWISSKNIFE_API_KEY)
+        info = backend.get_info()
+        assert info.pubkey  # wallet ID
+
+    def test_get_balance(self):
+        """Verify SwissKnife balance query."""
+        backend = SwissKnifeBackend(SWISSKNIFE_API_URL, SWISSKNIFE_API_KEY)
+        balance = backend.get_balance()
+        assert isinstance(balance, int)
+
+    def test_full_flow(self):
+        """GET request with automatic L402 payment via SwissKnife."""
+        client = L402Client.with_swissknife(SWISSKNIFE_API_URL, SWISSKNIFE_API_KEY)
+
+        response = client.get(f"{L402_SERVER_URL}/api/data")
         assert response.status == 200
         assert response.paid is True
         assert response.receipt is not None
         assert response.receipt.amount_sats == 100
 
     def test_token_caching(self):
-        """Verify token caching through Python bindings."""
-        client, server = create_mock_client({"/api/data": 100})
+        """Tokens are cached and reused."""
+        client = L402Client.with_swissknife(SWISSKNIFE_API_URL, SWISSKNIFE_API_KEY)
 
-        r1 = client.get(f"{server.url}/api/data")
+        r1 = client.get(f"{L402_SERVER_URL}/api/data")
         assert r1.paid is True
 
-        r2 = client.get(f"{server.url}/api/data")
+        r2 = client.get(f"{L402_SERVER_URL}/api/data")
         assert r2.paid is False
-        assert r2.status == 200
+        assert r2.cached_token is True
 
     def test_budget_enforcement(self):
-        """Verify budget enforcement through Python bindings."""
+        """Budget limits are enforced with SwissKnife backend."""
         budget = Budget(per_request_max=50)
-        client, server = create_mock_client({"/api/expensive": 100}, budget=budget)
+        client = L402Client.with_swissknife(
+            SWISSKNIFE_API_URL,
+            SWISSKNIFE_API_KEY,
+            budget=budget,
+        )
 
         with pytest.raises(ValueError, match="BudgetExceeded"):
-            client.get(f"{server.url}/api/expensive")
+            client.get(f"{L402_SERVER_URL}/api/data")
 
     def test_receipts(self):
-        """Verify receipt tracking through Python bindings."""
-        client, server = create_mock_client({"/api/a": 10, "/api/b": 20})
+        """Receipt tracking works with SwissKnife backend."""
+        client = L402Client.with_swissknife(SWISSKNIFE_API_URL, SWISSKNIFE_API_KEY)
 
-        client.get(f"{server.url}/api/a")
-        client.get(f"{server.url}/api/b")
+        client.get(f"{L402_SERVER_URL}/api/cheap")
+        client.get(f"{L402_SERVER_URL}/api/data")
 
         receipts = client.receipts()
         assert len(receipts) == 2
-        assert receipts[0].amount_sats == 10
-        assert receipts[1].amount_sats == 20
-        assert client.total_spent() == 30
+        assert client.total_spent() == 110

@@ -2,46 +2,33 @@
 
 import pytest
 
-from bolt402 import Budget, create_mock_client
+from bolt402 import Budget, L402Client
 
 
 @pytest.fixture()
-def mock_setup():
-    """Create a mock client and server with standard test endpoints.
+def client_setup():
+    """Create a client with dummy LND credentials for constructor tests.
 
-    Returns a dict with:
-        client: L402Client connected to mock backend
-        server: MockL402Server with test endpoints
-        endpoints: Dict of endpoint paths to prices
+    This client cannot make real requests but is valid for testing tool
+    construction, metadata, and budget reporting.
     """
-    endpoints = {
-        "/api/weather": 50,
-        "/api/market-data": 200,
-        "/api/premium": 1000,
-    }
-    client, server = create_mock_client(endpoints)
-    return {
-        "client": client,
-        "server": server,
-        "endpoints": endpoints,
-    }
+    client = L402Client.with_lnd_rest(
+        "https://localhost:8080",
+        "deadbeef0123456789",
+    )
+    return {"client": client}
 
 
 @pytest.fixture()
-def budget_mock_setup():
-    """Create a mock client with budget limits.
+def budget_client_setup():
+    """Create a client with budget limits and dummy LND credentials.
 
     Budget: 500 sats per request, 2000 sats daily.
     """
-    endpoints = {
-        "/api/cheap": 50,
-        "/api/mid": 200,
-        "/api/expensive": 1000,
-    }
     budget = Budget(per_request_max=500, daily_max=2000)
-    client, server = create_mock_client(endpoints, budget=budget)
-    return {
-        "client": client,
-        "server": server,
-        "endpoints": endpoints,
-    }
+    client = L402Client.with_lnd_rest(
+        "https://localhost:8080",
+        "deadbeef0123456789",
+        budget=budget,
+    )
+    return {"client": client}

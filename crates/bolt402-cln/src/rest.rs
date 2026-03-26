@@ -1,19 +1,18 @@
 //! CLN REST API backend implementation.
 //!
-//! Connects to a Core Lightning node using the c-lightning-REST plugin
-//! (default port 3001) and implements the [`LnBackend`] trait for invoice
-//! payments, balance queries, and node info.
+//! Connects to a Core Lightning node using the CLN REST interface
+//! and implements the [`LnBackend`] trait for invoice payments, balance
+//! queries, and node info.
 //!
 //! This backend is suitable for WASM/browser environments where gRPC is
 //! unavailable, and for setups where REST is simpler to configure.
 //!
 //! # Authentication
 //!
-//! Requests are authenticated via either:
-//! - The `macaroon` header containing a hex-encoded macaroon, or
-//! - The `Rune` header containing a CLN rune token.
+//! Requests are authenticated via the `Rune` header containing a CLN rune
+//! token. Runes are CLN's native bearer token system for API authorization.
 //!
-//! # Example (macaroon)
+//! # Example
 //!
 //! ```rust,no_run
 //! use bolt402_cln::ClnRestBackend;
@@ -21,24 +20,6 @@
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let backend = ClnRestBackend::new(
-//!     "https://localhost:3001",
-//!     "0201036c6e640258030a...",  // hex-encoded macaroon
-//! )?;
-//!
-//! let info = backend.get_info().await?;
-//! println!("Connected to: {} ({})", info.alias, info.pubkey);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Example (rune)
-//!
-//! ```rust,no_run
-//! use bolt402_cln::ClnRestBackend;
-//! use bolt402_proto::LnBackend;
-//!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let backend = ClnRestBackend::with_rune(
 //!     "https://localhost:3001",
 //!     "rune_token_value...",
 //! )?;
@@ -60,32 +41,18 @@ use serde::Deserialize;
 use crate::error::ClnError;
 
 // ---------------------------------------------------------------------------
-// Authentication
-// ---------------------------------------------------------------------------
-
-/// Authentication method for the CLN REST API.
-#[derive(Debug, Clone)]
-enum AuthMethod {
-    /// Hex-encoded macaroon sent via the `macaroon` header.
-    Macaroon(String),
-    /// Rune token sent via the `Rune` header.
-    Rune(String),
-}
-
-// ---------------------------------------------------------------------------
 // ClnRestBackend
 // ---------------------------------------------------------------------------
 
 /// Core Lightning (CLN) Lightning backend via REST API.
 ///
-/// Uses the c-lightning-REST plugin API to pay invoices, query balances,
-/// and retrieve node information. Authenticated via hex-encoded macaroon
-/// or rune token.
+/// Uses the CLN REST API to pay invoices, query balances, and retrieve
+/// node information. Authenticated via rune token.
 #[derive(Clone)]
 pub struct ClnRestBackend {
     client: HttpClient,
     url: String,
-    auth: AuthMethod,
+    rune: String,
 }
 
 impl fmt::Debug for ClnRestBackend {
@@ -97,28 +64,9 @@ impl fmt::Debug for ClnRestBackend {
 }
 
 impl ClnRestBackend {
-    /// Create a new CLN REST backend using macaroon authentication.
-    ///
-    /// # Arguments
-    ///
-    /// * `url` - REST API endpoint (e.g. `https://localhost:3001`)
-    /// * `macaroon` - Hex-encoded access macaroon
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ClnError::Transport`] if the HTTP client cannot be built.
-    pub fn new(url: &str, macaroon: &str) -> Result<Self, ClnError> {
-        let client = build_http_client()?;
-        Ok(Self {
-            client,
-            url: url.trim_end_matches('/').to_string(),
-            auth: AuthMethod::Macaroon(macaroon.to_string()),
-        })
-    }
-
     /// Create a new CLN REST backend using rune authentication.
     ///
-    /// Rune is CLN's native bearer token system, simpler than macaroons.
+    /// Runes are CLN's native bearer token system for API authorization.
     ///
     /// # Arguments
     ///
@@ -128,23 +76,23 @@ impl ClnRestBackend {
     /// # Errors
     ///
     /// Returns [`ClnError::Transport`] if the HTTP client cannot be built.
-    pub fn with_rune(url: &str, rune: &str) -> Result<Self, ClnError> {
+    pub fn new(url: &str, rune: &str) -> Result<Self, ClnError> {
         let client = build_http_client()?;
         Ok(Self {
             client,
             url: url.trim_end_matches('/').to_string(),
-            auth: AuthMethod::Rune(rune.to_string()),
+            rune: rune.to_string(),
         })
     }
 
     /// Create a new CLN REST backend with a custom HTTP client.
     ///
     /// Useful for custom TLS configuration, proxies, or testing.
-    pub fn with_client(url: &str, macaroon: &str, client: HttpClient) -> Self {
+    pub fn with_client(url: &str, rune: &str, client: HttpClient) -> Self {
         Self {
             client,
             url: url.trim_end_matches('/').to_string(),
-            auth: AuthMethod::Macaroon(macaroon.to_string()),
+            rune: rune.to_string(),
         }
     }
 
@@ -152,40 +100,29 @@ impl ClnRestBackend {
     ///
     /// Reads from:
     /// - `CLN_REST_URL` (default: `https://localhost:3001`)
-    /// - `CLN_MACAROON_HEX` - hex-encoded macaroon string (preferred)
-    /// - `CLN_RUNE` - rune token string (fallback)
-    ///
-    /// If both `CLN_MACAROON_HEX` and `CLN_RUNE` are set,
-    /// `CLN_MACAROON_HEX` takes precedence.
+    /// - `CLN_RUNE` - rune token string
     ///
     /// # Errors
     ///
-    /// Returns an error if neither authentication variable is set, or if the
-    /// HTTP client cannot be built.
+    /// Returns an error if `CLN_RUNE` is not set, or if the HTTP client
+    /// cannot be built.
     ///
-    /// Not available on WASM targets (use `new()` or `with_rune()` instead).
+    /// Not available on WASM targets (use `new()` instead).
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_env() -> Result<Self, ClnError> {
         let url =
             std::env::var("CLN_REST_URL").unwrap_or_else(|_| "https://localhost:3001".to_string());
 
-        if let Ok(macaroon) = std::env::var("CLN_MACAROON_HEX") {
-            Self::new(&url, &macaroon)
-        } else if let Ok(rune) = std::env::var("CLN_RUNE") {
-            Self::with_rune(&url, &rune)
+        if let Ok(rune) = std::env::var("CLN_RUNE") {
+            Self::new(&url, &rune)
         } else {
-            Err(ClnError::Payment(
-                "neither CLN_MACAROON_HEX nor CLN_RUNE is set".to_string(),
-            ))
+            Err(ClnError::Payment("CLN_RUNE is not set".to_string()))
         }
     }
 
     /// Attach authentication headers to a request builder.
     fn authenticate(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        match &self.auth {
-            AuthMethod::Macaroon(mac) => builder.header("macaroon", mac),
-            AuthMethod::Rune(rune) => builder.header("Rune", rune),
-        }
+        builder.header("Rune", &self.rune)
     }
 }
 
@@ -538,30 +475,23 @@ mod tests {
 
     #[test]
     fn cln_rest_backend_debug() {
-        let backend = ClnRestBackend::new("https://localhost:3001", "deadbeef").unwrap();
+        let backend = ClnRestBackend::new("https://localhost:3001", "test_rune").unwrap();
         let debug = format!("{backend:?}");
         assert!(debug.contains("ClnRestBackend"));
         assert!(debug.contains("localhost:3001"));
+        // Rune value should not leak in debug output.
+        assert!(!debug.contains("test_rune"));
     }
 
     #[test]
     fn cln_rest_backend_trims_url() {
-        let backend = ClnRestBackend::new("https://localhost:3001///", "deadbeef").unwrap();
+        let backend = ClnRestBackend::new("https://localhost:3001///", "test_rune").unwrap();
         assert_eq!(backend.url, "https://localhost:3001");
     }
 
     #[test]
-    fn cln_rest_backend_with_rune_debug() {
-        let backend = ClnRestBackend::with_rune("https://localhost:3001", "some_rune").unwrap();
-        let debug = format!("{backend:?}");
-        assert!(debug.contains("ClnRestBackend"));
-        // Rune value should not leak in debug output.
-        assert!(!debug.contains("some_rune"));
-    }
-
-    #[test]
     fn cln_rest_backend_clone() {
-        let backend = ClnRestBackend::new("https://localhost:3001", "deadbeef").unwrap();
+        let backend = ClnRestBackend::new("https://localhost:3001", "test_rune").unwrap();
         let cloned = backend.clone();
         assert_eq!(cloned.url, backend.url);
     }
@@ -569,7 +499,7 @@ mod tests {
     #[test]
     fn cln_rest_backend_with_client() {
         let client = HttpClient::new();
-        let backend = ClnRestBackend::with_client("https://localhost:3001", "deadbeef", client);
+        let backend = ClnRestBackend::with_client("https://localhost:3001", "test_rune", client);
         assert_eq!(backend.url, "https://localhost:3001");
     }
 
@@ -578,7 +508,6 @@ mod tests {
     fn from_env_missing_auth() {
         // SAFETY: test runs single-threaded; set_var is safe here.
         unsafe {
-            std::env::remove_var("CLN_MACAROON_HEX");
             std::env::remove_var("CLN_RUNE");
         }
         let result = ClnRestBackend::from_env();
@@ -587,27 +516,9 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
-    fn from_env_macaroon() {
-        // SAFETY: test runs single-threaded; set_var is safe here.
-        unsafe {
-            std::env::set_var("CLN_MACAROON_HEX", "deadbeef");
-            std::env::set_var("CLN_REST_URL", "https://mynode:3001");
-        }
-        let backend = ClnRestBackend::from_env().unwrap();
-        assert_eq!(backend.url, "https://mynode:3001");
-        // Clean up
-        unsafe {
-            std::env::remove_var("CLN_MACAROON_HEX");
-            std::env::remove_var("CLN_REST_URL");
-        }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    #[test]
     fn from_env_rune() {
         // SAFETY: test runs single-threaded; set_var is safe here.
         unsafe {
-            std::env::remove_var("CLN_MACAROON_HEX");
             std::env::set_var("CLN_RUNE", "test_rune_value");
             std::env::set_var("CLN_REST_URL", "https://mynode:3001");
         }
@@ -626,13 +537,13 @@ mod tests {
         // SAFETY: test runs single-threaded; set_var is safe here.
         unsafe {
             std::env::remove_var("CLN_REST_URL");
-            std::env::set_var("CLN_MACAROON_HEX", "deadbeef");
+            std::env::set_var("CLN_RUNE", "test_rune_value");
         }
         let backend = ClnRestBackend::from_env().unwrap();
         assert_eq!(backend.url, "https://localhost:3001");
         // Clean up
         unsafe {
-            std::env::remove_var("CLN_MACAROON_HEX");
+            std::env::remove_var("CLN_RUNE");
         }
     }
 
