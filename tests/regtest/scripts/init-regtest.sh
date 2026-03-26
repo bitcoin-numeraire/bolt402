@@ -227,7 +227,6 @@ SWISSKNIFE_READY=false
 for i in $(seq 1 30); do
   if curl -sf -o /dev/null http://localhost:3000/v1/system/health 2>/dev/null; then
     SWISSKNIFE_READY=true
-    log "SwissKnife ready (HTTP $HTTP_CODE after ${i}s)."
     break
   fi
   sleep 2
