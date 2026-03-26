@@ -18,7 +18,7 @@ The AI agent uses `createBolt402Tools()` from bolt402-ai-sdk, which gives it:
 - Node.js 20+
 - [Corepack](https://yarnpkg.com/corepack) enabled (`corepack enable`)
 - An AI provider API key (Anthropic, xAI, or OpenAI)
-- A Lightning backend (LND, SwissKnife, or use mock mode)
+- A Lightning backend (LND or SwissKnife)
 
 ## Quick start
 
@@ -28,8 +28,7 @@ yarn install
 
 # Copy and configure environment variables
 cp .env.example .env.local
-# Edit .env.local — set at least one AI provider API key.
-# The demo defaults to mock mode (simulated Lightning payments).
+# Edit .env.local — set an AI provider API key and a Lightning backend.
 
 # Run in development mode
 yarn dev
@@ -104,10 +103,6 @@ SWISSKNIFE_URL=https://app.numeraire.tech
 SWISSKNIFE_API_KEY=your_api_key
 ```
 
-### Mock mode (default)
-
-Without any Lightning configuration, the demo runs in mock mode — simulated payments with fake receipts. Good for development and testing the UI flow.
-
 ## Architecture
 
 ```
@@ -127,7 +122,6 @@ demos/l402-explorer/
 │   │   ├── ProtocolFlow.tsx          # Protocol flow visualization modal
 │   │   └── SpendingDashboard.tsx     # Payment receipt tracker
 │   └── lib/
-│       ├── mock-backend.ts           # Mock backend for demo mode
 │       ├── satring.ts                # satring.com API client
 │       └── types.ts                  # UI type definitions
 ├── .env.example

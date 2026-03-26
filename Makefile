@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt check doc clean ci \
+.PHONY: build test lint fmt check doc clean ci wasm \
        regtest-certs regtest-up regtest-init regtest-test regtest-down regtest-clean regtest \
        regtest-logs regtest-status
 
@@ -35,6 +35,11 @@ doc:
 # Open documentation in browser
 doc-open:
 	cargo doc --workspace --no-deps --open
+
+# Build WASM package (default: web target)
+WASM_TARGET ?= bundler
+wasm:
+	wasm-pack build crates/bolt402-wasm --target $(WASM_TARGET)
 
 # Clean build artifacts
 clean:

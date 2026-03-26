@@ -36,8 +36,8 @@
 
 export { createBolt402Tools, type Bolt402ToolsConfig } from './tools.js';
 
-// Re-export WASM types for convenience
-export type {
+// Re-export WASM runtime values and types so consumers don't need bolt402-wasm directly
+export {
   WasmL402Client,
   WasmL402Response,
   WasmBudgetConfig,

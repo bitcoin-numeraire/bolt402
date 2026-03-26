@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
         id: 'payment',
         label: 'Lightning Payment',
         status: 'complete',
-        detail: `Hash: ${response.receipt.paymentHash.substring(0, 20)}... (${Number(response.receipt.latencyMs)}ms)`,
+        detail: `Hash: ${response.receipt.paymentHash.substring(0, 20)}... (${latencyMs}ms)`,
       });
       steps.push({
         id: 'retry',
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
         id: 'response',
         label: 'Response Data',
         status: 'complete',
-        detail: `Status ${response.status} — ${body.length} bytes`,
+        detail: `Status ${response.status} — ${body.length} bytes (${latencyMs}ms)`,
       });
     } else {
       steps.push({
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
             feeSats: Number(response.receipt.feeSats),
             totalCostSats: Number(response.receipt.totalCostSats()),
             paymentHash: response.receipt.paymentHash,
-            latencyMs: Number(response.receipt.latencyMs),
+            latencyMs,
           }
         : null,
       steps,
