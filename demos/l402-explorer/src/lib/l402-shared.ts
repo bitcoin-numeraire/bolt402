@@ -4,18 +4,14 @@
  * Both the chat route and the l402-fetch route use this so that receipts
  * accumulate in a single place and can be queried via /api/l402-receipts.
  *
- * For real backends (LND, SwissKnife), uses the Rust WASM L402 client.
- * For mock mode, uses a TypeScript mock that simulates L402 payments.
+ * Requires a real Lightning backend (LND or SwissKnife) configured via
+ * environment variables. See .env.example for details.
  */
 
-import { WasmL402Client, WasmBudgetConfig } from 'bolt402-wasm';
-import { MockL402Client } from '@/lib/mock-backend';
+import { WasmL402Client, WasmBudgetConfig } from 'bolt402-ai-sdk';
 
-/** Common client type — either the real WASM client or the TS mock. */
-export type L402ClientLike = WasmL402Client | MockL402Client;
-
-function createClient(): L402ClientLike {
-  const backendType = process.env.BACKEND_TYPE || 'mock';
+function createClient(): WasmL402Client {
+  const backendType = process.env.BACKEND_TYPE;
 
   if (backendType === 'lnd' && process.env.LND_URL && process.env.LND_MACAROON) {
     return WasmL402Client.withLndRest(
@@ -39,13 +35,16 @@ function createClient(): L402ClientLike {
     );
   }
 
-  return new MockL402Client();
+  throw new Error(
+    'No Lightning backend configured. Set BACKEND_TYPE to "lnd" or "swissknife" ' +
+      'and provide the required credentials in .env.local. See .env.example for details.',
+  );
 }
 
-let sharedClient: L402ClientLike | null = null;
+let sharedClient: WasmL402Client | null = null;
 
 /** Get the shared L402 client (creates on first call). */
-export function getSharedL402Client(): L402ClientLike {
+export function getSharedL402Client(): WasmL402Client {
   if (!sharedClient) {
     sharedClient = createClient();
   }

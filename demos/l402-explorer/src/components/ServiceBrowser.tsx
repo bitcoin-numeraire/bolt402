@@ -230,7 +230,7 @@ export default function ServiceBrowser({
         </div>
 
         {/* Right: Chat panel */}
-        <div className={`w-full sm:w-[420px] sm:shrink-0 ${activeTab === 'services' ? 'hidden sm:block' : ''}`}>
+        <div className={`w-full sm:w-[520px] sm:shrink-0 ${activeTab === 'services' ? 'hidden sm:block' : ''}`}>
           <div className="sm:sticky sm:top-20 h-[calc(100vh-12rem)] min-h-[400px] overflow-hidden">
             <ChatPanel services={initialServices} />
           </div>

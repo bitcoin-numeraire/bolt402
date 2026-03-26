@@ -219,9 +219,8 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
 
     // Get bolt402 payment tools (shared client so receipts persist)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bolt402Tools = createBolt402Tools({
-      client: getSharedL402Client() as any,
+      client: getSharedL402Client(),
     });
 
     // Get 402index MCP discovery tools (with fallback)
