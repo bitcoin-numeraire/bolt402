@@ -561,8 +561,8 @@ __metadata:
 
 "bolt402-wasm@file:../../pkg::locator=bolt402-wasm-tests%40workspace%3A.":
   version: 0.1.0
-  resolution: "bolt402-wasm@file:../../pkg#../../pkg::hash=c805a1&locator=bolt402-wasm-tests%40workspace%3A."
-  checksum: 10c0/83799be8cf73d464db25a2156fd575121ea7ba2c531c73a1e1f0e62d1816d11529e1cafd22832610f777b0e83b260a310f71711c2694dfa3114d311b8e192d92
+  resolution: "bolt402-wasm@file:../../pkg#../../pkg::hash=3e61ff&locator=bolt402-wasm-tests%40workspace%3A."
+  checksum: 10c0/ba0ffb40733e46b0bc8398805019e7c60e7313dd8afe5f157978786d43f2c9bc1d66c6771f60fe97c867a1856a37aeaf011810576dcb71f65d1e630793a159ee
   languageName: node
   linkType: hard
 

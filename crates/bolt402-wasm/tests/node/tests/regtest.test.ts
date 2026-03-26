@@ -14,12 +14,7 @@
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
-import {
-  WasmL402Client,
-  WasmBudgetConfig,
-  WasmLndRestBackend,
-  WasmSwissKnifeBackend,
-} from "bolt402-wasm";
+import { WasmL402Client, WasmBudgetConfig } from "bolt402-wasm";
 import * as fs from "fs";
 import * as path from "path";
 

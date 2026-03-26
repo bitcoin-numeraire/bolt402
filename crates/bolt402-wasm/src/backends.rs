@@ -217,6 +217,19 @@ impl WasmClnRestBackend {
         Ok(Self { inner })
     }
 
+    /// Create a new CLN REST backend with rune authentication.
+    ///
+    /// Named constructor for clarity — equivalent to `new WasmClnRestBackend(url, rune)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - CLN REST API URL (e.g. `https://localhost:3001`)
+    /// * `rune` - Rune token string (CLN's native bearer token)
+    #[wasm_bindgen(js_name = "withRune")]
+    pub fn with_rune(url: &str, rune: &str) -> Result<WasmClnRestBackend, JsError> {
+        Self::new(url, rune)
+    }
+
     /// Pay a BOLT11 Lightning invoice.
     ///
     /// Returns a `Promise<WasmPaymentResult>`.
