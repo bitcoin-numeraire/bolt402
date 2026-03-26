@@ -1,12 +1,22 @@
 use base64::Engine;
 use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
 
-/// Base64 decoder that accepts both padded and unpadded input.
+/// Base64 decoder (standard alphabet) that accepts both padded and unpadded input.
 ///
 /// Many L402 servers omit base64 padding (`=`) from macaroons.
 /// The L402 spec doesn't mandate padding, so we accept both.
-const BASE64: GeneralPurpose = GeneralPurpose::new(
+const BASE64_STANDARD: GeneralPurpose = GeneralPurpose::new(
     &base64::alphabet::STANDARD,
+    GeneralPurposeConfig::new()
+        .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
+);
+
+/// Base64 decoder (URL-safe alphabet) that accepts both padded and unpadded input.
+///
+/// Some L402 servers encode macaroons with the URL-safe base64 alphabet
+/// (`-` and `_` instead of `+` and `/`).
+const BASE64_URL_SAFE: GeneralPurpose = GeneralPurpose::new(
+    &base64::alphabet::URL_SAFE,
     GeneralPurposeConfig::new()
         .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
 );
@@ -90,12 +100,14 @@ impl L402Challenge {
             reason: "missing 'invoice' parameter".to_string(),
         })?;
 
-        // Validate macaroon is valid base64
-        BASE64
-            .decode(&macaroon)
-            .map_err(|e| L402Error::InvalidMacaroon {
-                reason: format!("base64 decode failed: {e}"),
-            })?;
+        // Validate macaroon is valid base64 (standard or URL-safe alphabet)
+        if BASE64_STANDARD.decode(&macaroon).is_err() {
+            BASE64_URL_SAFE
+                .decode(&macaroon)
+                .map_err(|e| L402Error::InvalidMacaroon {
+                    reason: format!("base64 decode failed: {e}"),
+                })?;
+        }
 
         // Validate invoice looks like a BOLT11 invoice
         if !invoice.starts_with("lnbc") && !invoice.starts_with("lntb") {
@@ -208,6 +220,15 @@ mod tests {
         let header = r#"Bearer token="abc""#;
         let err = L402Challenge::from_header(header).unwrap_err();
         assert!(matches!(err, L402Error::InvalidChallenge { .. }));
+    }
+
+    #[test]
+    fn parse_url_safe_base64_macaroon() {
+        // URL-safe base64 uses - and _ instead of + and /
+        let header =
+            r#"L402 macaroon="YWJj-ZGVm_YQ", invoice="lnbc100n1pj9nr7mpp5test""#;
+        let challenge = L402Challenge::from_header(header).unwrap();
+        assert_eq!(challenge.macaroon, "YWJj-ZGVm_YQ");
     }
 
     #[test]
