@@ -1716,15 +1716,15 @@ __metadata:
 
 "bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D85e12a%26locator%3Dl402-explorer%2540workspace%253A.":
   version: 0.1.0
-  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=51ce01&locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D85e12a%26locator%3Dl402-explorer%2540workspace%253A."
-  checksum: 10c0/c1cb1214a4b225f57c241882ed185e993bf3ebe9183adc7764ada11f0a56859ac4791bec69f527c478383fe545c45caef9cbbc971b7cde1b2eeec312a421f66d
+  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=ef28a6&locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D85e12a%26locator%3Dl402-explorer%2540workspace%253A."
+  checksum: 10c0/ac6fa3ea364868cf8544369b498009589b120def8c40a9431da49c90a4b16f70c13e8ffce90171a59d94bda63bdf7049780479e6cabbc832af8a17b3a28ea13d
   languageName: node
   linkType: hard
 
 "bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=l402-explorer%40workspace%3A.":
   version: 0.1.0
-  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=51ce01&locator=l402-explorer%40workspace%3A."
-  checksum: 10c0/c1cb1214a4b225f57c241882ed185e993bf3ebe9183adc7764ada11f0a56859ac4791bec69f527c478383fe545c45caef9cbbc971b7cde1b2eeec312a421f66d
+  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=ef28a6&locator=l402-explorer%40workspace%3A."
+  checksum: 10c0/ac6fa3ea364868cf8544369b498009589b120def8c40a9431da49c90a4b16f70c13e8ffce90171a59d94bda63bdf7049780479e6cabbc832af8a17b3a28ea13d
   languageName: node
   linkType: hard
 
