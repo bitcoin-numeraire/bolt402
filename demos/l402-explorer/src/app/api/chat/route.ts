@@ -39,7 +39,6 @@ async function getIndexMCPClient() {
           const parsed = extractMCPText(result);
           if (parsed?.categories && typeof parsed.categories === 'object') {
             cachedCategories = Object.keys(parsed.categories);
-            console.log('[bolt402-chat] Cached categories:', cachedCategories.join(', '));
           }
         }
       } catch (err) {
@@ -184,8 +183,8 @@ ${categoryList}
 ## Workflow
 
 When a user asks a question:
-1. Use search_services with q (keyword), protocol="L402", and limit=200. The keyword search is fuzzy — use simple, broad terms (e.g. "twitter", "bitcoin price", "weather").
-2. If no results, retry with different keywords: synonyms, shorter terms, or related concepts.
+1. Use search_services with a SHORT, SIMPLE keyword in q, protocol="L402", and limit=200. Use ONE or TWO words maximum (e.g. q="twitter", q="bitcoin", q="weather"). Do NOT combine multiple terms like "twitter tweets x social" — that will fail.
+2. If no results, try ONE more search with a single synonym (e.g. "tweets" → "twitter"). If still nothing, tell the user — do not keep retrying.
 3. Pick the best service based on health, reliability_score, and latency.
 4. Use l402_fetch to call the chosen endpoint URL and pay with Lightning.
 5. Present the data clearly with cost attribution.

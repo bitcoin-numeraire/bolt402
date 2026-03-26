@@ -4,6 +4,8 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import type { L402Service } from '@/lib/types';
 
 interface ChatPanelProps {
@@ -163,8 +165,8 @@ export default function ChatPanel({ services }: ChatPanelProps) {
                     );
                   }
                   return (
-                    <div key={i} className="prose prose-sm prose-invert max-w-none prose-p:my-1.5 prose-headings:my-2 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-code:text-[#F7931A] prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-zinc-800 prose-pre:border prose-pre:border-zinc-700 prose-a:text-[#F7931A] prose-strong:text-zinc-100">
-                      <ReactMarkdown>{part.text}</ReactMarkdown>
+                    <div key={i} className="prose prose-sm prose-invert max-w-none prose-p:my-1.5 prose-headings:my-2 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-code:text-[#F7931A] prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-zinc-800 prose-pre:border prose-pre:border-zinc-700 prose-a:text-[#F7931A] prose-strong:text-zinc-100 break-words [overflow-wrap:anywhere]">
+                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{part.text}</ReactMarkdown>
                     </div>
                   );
                 }
